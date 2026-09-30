@@ -1,0 +1,25 @@
+import {test,expect} from '@playwright/test';
+test('parcel selection, async calculation, comparison and export persist',async({page})=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:5174');
+ await page.getByRole('button',{name:'Open workspace'}).click();
+ await expect(page.getByRole('heading',{name:'Build a scenario'})).toBeVisible();
+ await page.getByRole('checkbox',{name:'Select Parcel 001',exact:true}).check();
+ await page.getByRole('checkbox',{name:'Select Parcel 002',exact:true}).check();
+ const name=`Browser courtyard ${Date.now()}`;
+ await page.getByLabel('Scenario name').fill(name);
+ await page.getByRole('button',{name:'Calculate 2 selected parcels'}).click();
+ const row=page.getByRole('row').filter({hasText:name});
+ await expect(row.getByText('complete',{exact:true})).toBeVisible({timeout:30000});
+ await page.getByRole('checkbox',{name:`Compare ${name}`,exact:true}).check();
+ await expect(page.getByRole('heading',{name:'Estimated unit capacity'})).toBeVisible();
+ const [download]=await Promise.all([page.waitForEvent('download'),row.getByRole('link',{name:'Export'}).click()]);
+ const stream=await download.createReadStream();let text='';for await(const chunk of stream)text+=chunk.toString();const data=JSON.parse(text);
+ expect(data.parcel_ids).toHaveLength(2);expect(data.results.units).toBeGreaterThan(0);expect(data.results.formula_version).toBe(1);
+ await page.reload();await expect(page.getByRole('row').filter({hasText:name})).toBeVisible();
+ await page.screenshot({path:'.runtime/parcels-desktop.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2)).toBe(true);
+ await page.screenshot({path:'.runtime/parcels-mobile.png',fullPage:true});
+ expect(errors).toEqual([]);
+});

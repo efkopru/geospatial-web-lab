@@ -1,0 +1,78 @@
+name: geolab-fleet-monitor
+services:
+  db:
+    restart: unless-stopped
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_USER: geolab
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Generate .env with scripts/configure-env.mjs}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:?Generate .env with scripts/configure-env.mjs}
+      POSTGRES_DB: fleet_monitor
+    volumes:
+      - "db-data:/var/lib/postgresql/data"
+      - "../scripts/init-database.sh:/docker-entrypoint-initdb.d/20-geolab.sh:ro"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U geolab -d fleet_monitor"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis:
+    restart: unless-stopped
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  migrate:
+    build: ./backend
+    environment: &app-env
+      DATABASE_URL: postgres://geolab_app@db:5432/fleet_monitor
+      PGPASSWORD: ${APP_DATABASE_PASSWORD:?Generate .env with scripts/configure-env.mjs}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?Set SECRET_KEY_BASE in .env}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      SECURE_COOKIES: ${SECURE_COOKIES:-false}
+      FORCE_SSL: ${FORCE_SSL:-false}
+    command: ["sh", "-c", "bundle exec rails runner 'ActiveRecord::Base.connection_pool.schema_migration.create_table' && bundle exec rails db:migrate"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  api:
+    stop_grace_period: 30s
+    restart: unless-stopped
+    build: ./backend
+    environment: *app-env
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/up"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+  worker:
+    stop_grace_period: 40s
+    restart: unless-stopped
+    build: ./backend
+    environment: *app-env
+    command: ["bundle", "exec", "sidekiq", "-c", "3"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+  web:
+    restart: unless-stopped
+    build:
+      context: ..
+      dockerfile: scripts/Frontend.Dockerfile
+      args:
+        PROJECT: 03-fleet-monitor
+    ports: ["127.0.0.1:5173:80"]
+    depends_on:
+      api: {condition: service_healthy}
+volumes:
+  db-data:
+  redis-data:

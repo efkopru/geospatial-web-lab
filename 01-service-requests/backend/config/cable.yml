@@ -1,0 +1,8 @@
+development: &default
+  adapter: redis
+  url: <%= ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379/0") %>
+  channel_prefix: service_requests
+production:
+  <<: *default
+test:
+  adapter: test

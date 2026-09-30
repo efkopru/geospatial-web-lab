@@ -1,0 +1,107 @@
+name: Verify five applications
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: geolab
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Install PostgreSQL 17 client for matching schema dumps
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo tee /etc/apt/sources.list.d/pgdg.sources > /dev/null <<'PGDG'
+          Types: deb
+          URIs: https://apt.postgresql.org/pub/repos/apt
+          Suites: noble-pgdg
+          Architectures: amd64
+          Components: main
+          Signed-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          PGDG
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+      - run: npm ci
+      - name: Install every backend lockfile
+        run: |
+          for backend in 0*/backend; do (cd "$backend" && bundle install); done
+      - name: Create databases and PostGIS
+        env:
+          PGPASSWORD: geolab
+        run: |
+          psql -h 127.0.0.1 -U postgres -d postgres -c "CREATE ROLE geolab LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD 'geolab'"
+          for db in service_requests data_quality_portal fleet_monitor parcel_scenarios infrastructure_inspections; do
+            for suffix in '' _test; do
+              createdb -h 127.0.0.1 -U postgres -O geolab "$db$suffix"
+              psql -h 127.0.0.1 -U postgres -d "$db$suffix" -c 'CREATE EXTENSION postgis'
+            done
+          done
+      - run: bash scripts/test-backends.sh
+      - run: npm test
+      - name: Runtime script regressions
+        run: |
+          node --test tests/runtime-scripts.node.mjs
+          bash tests/runtime-shell.test.sh
+      - name: Compose database password regression
+        env:
+          ADMIN_DATABASE_URL: postgres://postgres:geolab@127.0.0.1:5432/postgres
+        run: cd 01-service-requests/backend && bundle exec ruby ../../tests/database-password.rb
+      - name: Validate deployment configuration
+        env:
+          SECRET_KEY_BASE: ci-config-validation-only-not-a-deployed-secret
+          POSTGRES_PASSWORD: ci-config-admin-password
+          APP_DATABASE_PASSWORD: ci-config-app-password
+        run: |
+          for project in 0*/compose.yaml; do docker compose -f "$project" config --quiet; done
+      - run: npm run build > /tmp/frontend-build.log
+      - run: npx playwright install --with-deps chromium
+      - name: Run browser workflows
+        run: |
+          bash scripts/seed-demo.sh
+          bash scripts/production-check.sh
+          bash scripts/start-backends.sh > /tmp/backends.log 2>&1 &
+          backend_pid=$!
+          node scripts/dev-frontends.mjs > /tmp/frontends.log 2>&1 &
+          frontend_pid=$!
+          trap 'kill -TERM "$backend_pid" "$frontend_pid" 2>/dev/null || true; wait "$backend_pid" "$frontend_pid" 2>/dev/null || true' EXIT
+          for port in 3101 3102 3103 3104 3105; do
+            for attempt in $(seq 1 90); do curl -fsS "http://127.0.0.1:$port/up" && break || sleep 2; done
+            curl -fsS "http://127.0.0.1:$port/up"
+          done
+          for port in 5171 5172 5173 5174 5175; do
+            for attempt in $(seq 1 60); do curl -fsS "http://127.0.0.1:$port/" > /dev/null && break || sleep 1; done
+            curl -fsS "http://127.0.0.1:$port/" > /dev/null
+          done
+          npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: diagnostics
+          include-hidden-files: true
+          path: |
+            test-results
+            playwright-report
+            .runtime/*.log
+            /tmp/backends.log
+            /tmp/frontends.log
+            /tmp/frontend-build.log

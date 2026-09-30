@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+**/dist
+.runtime
+test-results
+playwright-report
+**/log
+**/tmp
+**/.env
+.git
+**/.env.*
+**/.bundle
+**/vendor
+**/__pycache__
+output
+tmp
+.firecrawl
