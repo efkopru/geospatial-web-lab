@@ -1,0 +1,9 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"asset_id":"PK-001","name":"Elm Meadow","condition":"good","area_acres":14},"geometry":{"type":"Polygon","coordinates":[[[-96.999,33.041],[-96.994,33.041],[-96.994,33.045],[-96.999,33.045],[-96.999,33.041]]]}},
+    {"type":"Feature","properties":{"asset_id":"PK-002","name":"Cedar Grove","condition":"fair","area_acres":9},"geometry":{"type":"Polygon","coordinates":[[[-97.011,33.029],[-97.007,33.029],[-97.007,33.033],[-97.011,33.033],[-97.011,33.029]]]}},
+    {"type":"Feature","properties":{"asset_id":"BN-003","name":"Trail bench","condition":"good"},"geometry":{"type":"Point","coordinates":[-97.002,33.038]}},
+    {"type":"Feature","properties":{"asset_id":"TR-004","name":"Creek connector","condition":"fair"},"geometry":{"type":"LineString","coordinates":[[-97.010,33.035],[-97.005,33.038],[-97.001,33.041]]}}
+  ]
+}

@@ -1,0 +1,9 @@
+# Keep the standalone folder portable as a separate source checkout.
+node_modules/
+**/dist/
+/output/
+/coverage/
+/test-results/
+/playwright-report/
+.vite/
+*.log
