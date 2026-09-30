@@ -1,0 +1,13 @@
+# Standalone adapter contract
+
+Each app owns `src/local-api.js` and its copied UI. Export `seed()` returning JSON-serializable application state and `handle(request, context)` (may be async). The runtime calls `seed()` on first use/reset and persists state in its own IndexedDB database. Do not import original application source.
+
+Request: `{path, method, body, query}`. `path` always starts `/api/`, without query; `query` is URLSearchParams; body is already an object. Context: `{state, user, users, now, fail, requireStaff}`. `state` is a mutable transaction draft, `now()` returns an ISO timestamp, `fail(message, status=422)` throws, `requireStaff()` rejects reporter mutations. Users are `{id:1,name:'Alex Morgan',role:'staff',email:'staff@example.test'}`, `{id:2,name:'Jordan Lee',role:'reporter',email:'reporter@example.test'}`, `{id:3,name:'Casey Rivera',role:'staff',email:'crew@example.test'}`. Preserve API response contracts expected by the copied UI. The runtime persists after successful non-GET requests, emits local update events, rolls back failed mutations, and returns detached JSON copies. GET handlers must not mutate state.
+
+Downloads return `{download:{filename,mime,content}}`; content is a string. A shared click handler intercepts `/api/` download links and creates browser Blob downloads. These requests never reach a server. Unknown routes must fail explicitly.
+
+Optional export `start(runtime)` for fleet replay. Called after storage loads. `runtime.read()` returns a detached current state; `runtime.mutate(fn)` serializes, persists, and notifies after fn(state, context), and returns a Promise. `runtime.ready` resolves when initialized. Return a cleanup function. Browser processing is local; do not claim durable background processing. Coordinate replay across tabs using a Web Locks leader if available, or pause secondary-tab playback explicitly.
+
+Keep application-specific domain functions in `src/local-api.js` and import them directly in domain tests. The Vite configuration maps `@geo/shared` to `standalone/shared/index.jsx`. Each entry point calls `configureStandalone({id,seed,handle,start})` before rendering. The shared shell provides local-storage status, reset, role selection, and JSON backup export. No Rails requests or WebSockets are used. Role selection is a simulation, never authentication.
+
+Use accurate UI wording: local updates, browser processing, synthetic data, and simulated roles. Document mathematical differences from PostGIS in the app README. Maintain dependencies in the standalone package and lockfile. Keep standalone implementation changes inside this directory so the original applications remain independently usable.

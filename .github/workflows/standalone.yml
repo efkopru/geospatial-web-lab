@@ -1,0 +1,47 @@
+name: Verify standalone applications
+
+on:
+  push:
+    paths:
+      - 'standalone/**'
+      - '.github/workflows/standalone.yml'
+  pull_request:
+    paths:
+      - 'standalone/**'
+      - '.github/workflows/standalone.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: standalone-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Test and build browser editions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: standalone
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: standalone/package-lock.json
+      - name: Install locked standalone dependencies
+        run: npm ci
+      - name: Test domain logic and browser storage
+        run: npm test
+      - name: Test interface workflows
+        run: npm run test:ui -- --maxWorkers=1
+      - name: Build all five static applications
+        run: npm run build
