@@ -1,0 +1,5 @@
+{
+  "name": "@geo/shared", "version": "1.0.0", "private": true, "type": "module",
+  "exports": {".": "./index.jsx", "./style.css": "./style.css"},
+  "dependencies": {"react": "19.3.0", "react-dom": "19.3.0", "@rails/actioncable": "^8.1.0", "@arcgis/core": "5.1.26", "cesium": "1.145.0"}
+}

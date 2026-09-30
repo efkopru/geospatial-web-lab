@@ -1,0 +1,11 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {"type":"Feature","properties":{"asset_id":"PK-101","name":"Oak Hollow","condition":"good"},"geometry":{"type":"Polygon","coordinates":[[[-97.008,33.044],[-97.003,33.044],[-97.003,33.048],[-97.008,33.048],[-97.008,33.044]]]}},
+    {"type":"Feature","properties":{"asset_id":"BN-102","name":"Picnic shelter","condition":"fair"},"geometry":{"type":"Point","coordinates":[-96.996,33.035]}},
+    {"type":"Feature","properties":{"name":"Missing identifier"},"geometry":{"type":"Point","coordinates":[-97.009,33.039]}},
+    {"type":"Feature","properties":{"asset_id":"PK-104","name":"Crossed boundary"},"geometry":{"type":"Polygon","coordinates":[[[-97.004,33.030],[-97.000,33.034],[-97.000,33.030],[-97.004,33.034],[-97.004,33.030]]]}},
+    {"type":"Feature","properties":{"asset_id":"BN-105","name":"Reversed coordinates"},"geometry":{"type":"Point","coordinates":[33.039,-97.002]}},
+    {"type":"Feature","properties":{"asset_id":"PK-106","name":"Open boundary"},"geometry":{"type":"Polygon","coordinates":[[[-97.016,33.037],[-97.012,33.037],[-97.012,33.040],[-97.016,33.040]]]}}
+  ]
+}

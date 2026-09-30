@@ -1,0 +1,21 @@
+{
+  "name": "geospatial-web-lab",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "workspaces": ["shared", "0*/frontend"],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "dev:1": "npm run dev --workspace @geo/service-requests",
+    "dev:2": "npm run dev --workspace @geo/data-quality-portal",
+    "dev:3": "npm run dev --workspace @geo/fleet-monitor",
+    "dev:4": "npm run dev --workspace @geo/parcel-scenarios",
+    "dev:5": "npm run dev --workspace @geo/infrastructure-inspections"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2", "@testing-library/react": "^16.3.2",
+    "@testing-library/jest-dom": "^6.9.1", "jsdom": "^28.1.0", "vitest": "^4.0.18"
+  }
+}
