@@ -1,0 +1,55 @@
+name: Check standalone demo in a browser
+
+# Opens the published standalone demo in Chromium: each app must start with browser storage,
+# export a backup, restore a changed backup and keep it after a reload. The publish workflow
+# calls this after every deployment. Pull requests that change the check run it against the
+# currently published site, so the check itself is tested before it is merged.
+on:
+  workflow_call:
+    inputs:
+      url:
+        description: Published site URL
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Published site URL (defaults to this repository's GitHub Pages URL)
+        required: false
+        type: string
+  pull_request:
+    paths:
+      - 'standalone/scripts/verify-site-browser.mjs'
+      - 'standalone/scripts/verify-site.mjs'
+      - '.github/workflows/standalone-browser-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    name: Check the published apps in Chromium
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: standalone
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: standalone/package-lock.json
+      - name: Install locked standalone dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Check the published apps
+        env:
+          SITE_URL: ${{ inputs.url || format('https://{0}.github.io/{1}/', github.repository_owner, github.event.repository.name) }}
+        run: npm run verify:browser -- "$SITE_URL"

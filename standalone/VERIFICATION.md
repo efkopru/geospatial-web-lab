@@ -127,6 +127,19 @@ Civic Works caps requests (5,000), imports (100) and retained CSV exports (30). 
 
 These numbers describe single-tab browser work on synthetic data. Full-stack measurements are in the [root verification record](../VERIFICATION.md#full-stack-performance-october-1-2026).
 
+## Public deployment (October 1, 2026)
+
+The standalone editions are published at [https://efkopru.github.io/geospatial-web-lab/](https://efkopru.github.io/geospatial-web-lab/) from `main` (commit `246bba4`). The [Publish standalone demo run](https://github.com/efkopru/geospatial-web-lab/actions/runs/36933360375) passed these steps:
+
+- the domain and interface tests and all five builds
+- a check of the built gallery through the local preview server
+- the GitHub Pages deployment
+- `verify-site.mjs` against the live URL: 29 URLs covering the gallery, all five apps, their bundled scripts, styles and icons, the Cesium assets, and the third-party notices and license copies
+
+Its first deployment attempt failed because Pages had not been enabled. After the repository was made public and Pages was enabled with GitHub Actions as the source, rerunning the deploy job succeeded.
+
+BROWSER_CHECK_PLACEHOLDER
+
 ## Scope of the evidence
 
 The browser checks used locally served production files with internet access for ArcGIS resources. They did not publish GitHub Pages or test a desktop installer, complete offline operation, every device/browser combination, or operational GIS datasets. Simulated roles are not authentication. The mathematical differences from PostGIS and local-storage limits are documented in [COMPARISON.md](COMPARISON.md).

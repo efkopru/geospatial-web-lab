@@ -18,8 +18,8 @@ Use sections 1 and 2 as public portfolio content. Sections 3 through 6 are imple
 | Proposed page route | `/projects/geospatial-web-lab/` |
 | Primary button | Read case study |
 | Primary button destination | The project's implemented portfolio page |
-| Public demo URL | Not configured; omit the demo button until deployment is verified |
-| Public source URL | Not configured; the repository is private |
+| Public demo URL | `https://efkopru.github.io/geospatial-web-lab/`: the standalone browser editions, published by the `Publish standalone demo` workflow and checked after each deployment. Secondary button: "Open live demo" |
+| Public source URL | `https://github.com/efkopru/geospatial-web-lab` (public since October 1, 2026). Optional "View source" button |
 | Card/hero image source | `output/screenshots/feature-report/03-live-map.jpg` |
 | Card/hero image alt text | Full-stack fleet monitor showing synthetic vehicle routes and geofences around Dallas. |
 | Technology badges | Ruby on Rails, React, PostgreSQL/PostGIS, ArcGIS, CesiumJS, Sidekiq, IndexedDB, JSTS |
@@ -148,7 +148,7 @@ The resulting suite demonstrates full-stack GIS integration alongside a portable
 
 ### Scope
 
-The project has no verified public application deployment. It uses synthetic data and makes no claim of municipal use, customer adoption, business savings, field-survey accuracy, or production scale. Docker images for all five full-stack applications build and pass a container smoke test in CI; this is not a hosted deployment. The standalone editions are browser applications, not desktop installers.
+The standalone browser editions are published as a static demo at https://efkopru.github.io/geospatial-web-lab/; the full-stack applications have no public deployment. It uses synthetic data and makes no claim of municipal use, customer adoption, business savings, field-survey accuracy, or production scale. Docker images for all five full-stack applications build and pass a container smoke test in CI; this is not a hosted deployment. The standalone editions are browser applications, not desktop installers.
 
 ---
 
@@ -157,12 +157,12 @@ The project has no verified public application deployment. It uses synthetic dat
 These notes are for the person or agent updating the portfolio. Do not render them as public case-study content.
 
 1. Read the destination portfolio's current project schema and conventions. Add one project named **Geospatial Web Lab**, with five applications and two editions. Preserve the site's existing typography, navigation, and project grouping.
-2. Use the card text and metadata from section 1. Map the proposed route to the site's routing conventions. Keep demo and source URLs absent or `null`; do not render empty links, `#` placeholders, localhost links, or inaccessible private-repository buttons.
+2. Use the card text and metadata from section 1. Map the proposed route to the site's routing conventions. Set `sourceUrl` to the public repository if the page should offer a "View source" button. Set `demoUrl` to the published standalone demo and label it as the standalone browser edition. Do not render empty links, `#` placeholders, localhost links, or inaccessible private-repository buttons.
 3. Use section 2 for the project page. Keep the AI-assisted description, synthetic-data labels, edition captions, and scope paragraph. If the page must be shorter, retain the overview, five-app summary, architecture comparison, and verification evidence.
 4. Copy the selected images using section 4. Rewrite relative Markdown image paths to the portfolio's actual asset URLs. Existing repository-relative paths work here but will not automatically work in a different repository.
 5. Make the first image the main visual. Present the five standalone screenshots as a gallery with edition labels and readable expanded views. Full-page screenshots need `height: auto` and a contain-style presentation; avoid cropping away attribution or important controls. Use descriptive alt text, intrinsic dimensions, and lazy loading for images below the main visual.
 6. Implement the architecture comparison as a semantic table or an accessible responsive equivalent. Present tests by edition. Do not add assertions, manual checks, screenshots, and automated tests into a single total.
-7. If a standalone demo is deployed later, publish the generated `standalone/dist` output to an appropriate static host, for example with the manual `Publish standalone demo` workflow. Verify all five app paths, assets, and notices with `npm run verify:site -- <url>`, then check browser storage and download controls in a browser. Preserve vendor attribution. Add its real public URL only after those checks. The original full-stack edition still requires backend services.
+7. The standalone demo is published at https://efkopru.github.io/geospatial-web-lab/. The `Publish standalone demo` workflow deploys `standalone/dist` to GitHub Pages, checks every app path, asset and notice, then opens each app in Chromium. There it exports a backup, restores a changed backup and confirms the change survives a reload. Rerun that workflow after standalone changes. Label the demo as the standalone browser edition with synthetic data. The full-stack edition still requires backend services and has no public deployment.
 8. Run the destination portfolio's normal validation and inspect desktop and mobile rendering. Verify the resulting project route, image loading, captions, and link destinations. Website deployment remains a separate action from creating this Markdown document.
 
 ### Framework-neutral content model
@@ -181,8 +181,8 @@ Adapt these fields to the existing portfolio schema. This is example content, no
   "editions": ["Full-stack", "Standalone browser"],
   "heroImage": "/images/projects/geospatial-web-lab/fleet-full-stack.jpg",
   "heroAlt": "Full-stack fleet monitor showing synthetic vehicle routes and geofences around Dallas.",
-  "demoUrl": null,
-  "sourceUrl": null
+  "demoUrl": "https://efkopru.github.io/geospatial-web-lab/",
+  "sourceUrl": "https://github.com/efkopru/geospatial-web-lab"
 }
 ```
 
@@ -215,12 +215,12 @@ Keep map attribution visible. Identify the edition beside every image. Counts an
 | Documented spherical approximations | Exact parity with PostGIS ellipsoidal calculations |
 | Synthetic parcel capacity and elevation examples | Permitting advice, measured terrain, or engineering clearance analysis |
 | Local JSON backup export and same-app restore | Cloud synchronization, cross-device sync, or record merging |
-| Static builds verified | A published GitHub Pages site or fully offline app (until a deployment is verified) |
+| Published standalone browser demo with automated site and browser checks | A hosted full-stack deployment, server-side persistence, or a fully offline app |
 | Container builds and smoke tests in CI | A hosted or production deployment |
 | Recorded single-runner benchmarks | Proven capacity, uptime, or production scale |
 | Recorded tests and browser checks | Proven uptime, production scale, security certification, or business impact |
 
-The source repository was verified **private** while preparing this document. Keep repository and private CI links in maintainer notes until there is an intentional public source release. Do not publish local account credentials, machine paths, database backups, or runtime logs. A public case-study page does not require making the source repository public.
+The source repository was private while this document was first prepared and was made public on October 1, 2026. A source link and CI links can now appear on the public page. The repository has no license file, so public source is viewable but grants no reuse license. Do not publish local account credentials, machine paths, database backups, or runtime logs.
 
 ## 6. Maintainer evidence references
 
@@ -235,7 +235,7 @@ Original application source baseline: `4d231e37b75754b206398ffcee371c1479913b9e`
 | [Edition comparison](standalone/COMPARISON.md) | Feature differences, local-processing limits, and spatial assumptions |
 | [Standalone verification](standalone/VERIFICATION.md) | Automated checks, browser acceptance evidence, screenshot record and storage benchmarks |
 | [Third-party notices](standalone/THIRD_PARTY_NOTICES.md) | Preserved vendor notices and license provenance |
-| [Private source repository](https://github.com/efkopru/geospatial-web-lab) | Source access for authorized collaborators; not a public portfolio button |
+| [Source repository](https://github.com/efkopru/geospatial-web-lab) | Public source; suitable for an optional "View source" button |
 | [Successful standalone CI at the baseline commit](https://github.com/efkopru/geospatial-web-lab/actions/runs/36666878977) | Clean Ubuntu installation, tests, and all five static builds |
 
 For a short portfolio card, use section 1. For the complete project page, use section 2 and its mapped images. Keep sections 3 through 6 with the implementation handoff.
