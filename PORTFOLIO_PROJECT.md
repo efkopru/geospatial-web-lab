@@ -146,7 +146,7 @@ The resulting suite demonstrates full-stack GIS integration alongside a portable
 
 ### Scope
 
-The project has no verified public application deployment. It uses synthetic data and makes no claim of municipal use, customer adoption, business savings, field-survey accuracy, or production scale. Container configuration was checked, but Docker image builds and runtime execution remain unverified. The standalone editions are browser applications, not desktop installers.
+The project has no verified public application deployment. It uses synthetic data and makes no claim of municipal use, customer adoption, business savings, field-survey accuracy, or production scale. Docker images for all five full-stack applications build and pass a container smoke test in CI; this is not a hosted deployment. The standalone editions are browser applications, not desktop installers.
 
 ---
 

@@ -113,15 +113,27 @@ test('canonical serialization retains prototype-like source property names as da
   assert.match(validateFeature(point(inherited), ['asset_id']).join(), /missing or blank/);
 });
 
-test('total stored upload size is capped while duplicate uploads still resolve to the existing dataset', async () => {
+test('total stored source size is capped while duplicate uploads still resolve to the existing dataset', async () => {
   const state = seed();
   // About 4.5 MB per upload: the 5 MB file limit still applies, and the total budget stops the third.
   const large = tag => Array.from({ length: 1900 }, (_, index) => point({ asset_id: `${tag}-${index}`, note: 'x'.repeat(2300) }));
   for (const tag of ['a', 'b']) await upload(state, large(tag), { name: `Large ${tag}` });
-  const stored = state.datasets.reduce((total, item) => total + (item.source_bytes ?? 0), 0);
+  const stored = state.datasets.reduce((total, item) => total + item.source_bytes, 0);
   assert.ok(stored < MAX_STORED_SOURCE_BYTES && stored > 8 * 1024 * 1024);
-  await assert.rejects(upload(state, large('c'), { name: 'Large c' }), /of the 10 MB local upload budget/);
+  // Seeded datasets were measured once on the first upload and kept their size.
+  assert.ok(state.datasets.every(item => Number.isInteger(item.source_bytes) && item.source_bytes > 0));
+  await assert.rejects(upload(state, large('c'), { name: 'Large c' }), /This 4\.\d MB dataset would bring stored datasets to (9|1\d)\.\d MB, over the 10\.0 MB local storage budget \(\d\.\d MB already stored\)/);
   assert.equal(state.datasets.length, 4);
   assert.equal((await upload(state, large('a'), { name: 'Large a again' })).duplicate, true);
   assert.equal((await upload(state, [point({ asset_id: 'small' })], { name: 'Small' })).duplicate, false);
+});
+
+test('the storage budget charges the compact stored size, not indentation in the uploaded file', async () => {
+  const state = seed();
+  const features = Array.from({ length: 50 }, (_, index) => point({ asset_id: `P-${index}` }));
+  const indented = JSON.stringify({ type: 'FeatureCollection', features }, null, 8);
+  await handle({ path: '/api/datasets', method: 'POST', body: { name: 'Indented', source: indented, required_attributes: ['asset_id'] } }, context(state));
+  const stored = state.datasets.at(-1);
+  assert.equal(stored.source_bytes, Buffer.byteLength(JSON.stringify(stored.source)));
+  assert.ok(stored.source_bytes < Buffer.byteLength(indented) / 2);
 });

@@ -56,7 +56,7 @@ Additional checks cover production eager loading, restricted-role migrations, Co
 
 ## Current delivery boundaries
 
-Applications ran directly in WSL. Docker builds and execution remain unverified because the local engine was unavailable. Remote CI status is available in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions), separately from the recorded local checks. No public application deployment exists. Frontend builds establish compilation, not deployment.
+Applications ran directly in WSL. Docker builds and execution were not verified locally because the engine was unavailable; all five stacks later built and passed a container smoke test on GitHub Actions. Remote CI status is available in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions), separately from the recorded local checks. No public application deployment exists. Frontend builds establish compilation, not deployment.
 
 ArcGIS basemaps and SDK assets require internet access. Cesium uses synthetic elevations and local assets without a terrain-service token. The 3D view requires WebGL. Imports and histories are bounded. The standalone editions have a [recorded performance baseline](standalone/VERIFICATION.md#performance-baseline-october-1-2026) that sets their storage limits; full-stack performance at scale is unverified.
 

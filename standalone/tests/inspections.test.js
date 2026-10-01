@@ -92,8 +92,10 @@ test('GET routes never mutate persisted state', () => {
 
 test('only the newest completed profile runs are retained, which covers every run the workspace lists', () => {
   const ctx = context();
+  const failed = { ...request(ctx, '/api/profile_runs', 'POST').profile_run };
+  Object.assign(ctx.state.profileRuns.find(run => run.id === failed.id), { status: 'failed', error_message: 'Restored failure' });
   const ids = Array.from({ length: PROFILE_RUN_LIMIT + 5 }, () => request(ctx, '/api/profile_runs', 'POST').profile_run.id);
-  assert.deepEqual(ctx.state.profileRuns.map(run => run.id), ids.slice(-PROFILE_RUN_LIMIT));
+  assert.deepEqual(ctx.state.profileRuns.map(run => run.id), [failed.id, ...ids.slice(-PROFILE_RUN_LIMIT)]);
   assert.deepEqual(request(ctx, '/api/profile_runs').profile_runs.map(run => run.id), ids.slice(-10).reverse());
   assert.throws(() => request(ctx, `/api/profile_runs/${ids[0]}`), error => error.status === 404);
   assert.equal(request(ctx, `/api/profile_runs/${ids.at(-1)}`).samples.length, 71);

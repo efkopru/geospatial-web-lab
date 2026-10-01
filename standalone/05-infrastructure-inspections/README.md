@@ -14,7 +14,7 @@ Follow the [suite setup instructions](../README.md). From `standalone`, `npm run
 - Use a staff demo role to resolve or reopen observations with explanatory notes. Every change appends an actor, action and timestamp to the local history.
 - Reject stale status changes using a version number. A form opened before another accepted edit must reload before it can write again.
 - Generate an actual 71-point corridor profile in the browser, inspect its chart and sample table, and download its GeoJSON.
-- Review the ten most recent profile runs. The browser keeps the newest 20 completed runs and removes older ones so each save stays small. Completed runs preserve the source asset snapshot and remain independent of subsequent observations or source changes.
+- Review the ten most recent profile runs. The browser keeps the newest 20 completed runs and removes older completed runs so each save stays small. Failed or pending runs are kept so they can be retried. A tab that still shows a removed run reports that it was not found. Completed runs preserve the source asset snapshot and remain independent of subsequent observations or source changes.
 - Export or restore a browser backup, or reset the demo from the shared controls.
 
 ## Profile mathematics
