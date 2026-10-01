@@ -1,0 +1,83 @@
+name: Publish standalone demo
+
+# Publishing makes the five browser editions public, so it only runs on request.
+# Enable Pages with "GitHub Actions" as the source before the first run.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: standalone-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Test and build browser editions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: standalone
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: standalone/package-lock.json
+      - name: Install locked standalone dependencies
+        run: npm ci
+      - name: Test domain logic and browser storage
+        run: npm test
+      - name: Test interface workflows
+        run: npm run test:ui -- --maxWorkers=1
+      - name: Build all five static applications
+        run: npm run build
+      - name: Check the built site through the local preview server
+        run: |
+          node scripts/serve.mjs preview &
+          server=$!
+          trap 'kill $server' EXIT
+          for attempt in $(seq 1 20); do curl -fs -o /dev/null http://127.0.0.1:5270/ && break; sleep 1; done
+          npm run verify:site -- http://127.0.0.1:5270/
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: standalone/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out verification script
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: standalone/scripts
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify the deployed gallery, apps, assets and notices
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          for attempt in $(seq 1 12); do
+            node standalone/scripts/verify-site.mjs "$PAGE_URL" && exit 0
+            sleep 10
+          done
+          exit 1

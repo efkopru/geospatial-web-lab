@@ -4,6 +4,11 @@ import { cleanSample, errorSample, cleanDigest } from './sample-data.js';
 
 const SUPPORTED = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'];
 const MAX_BYTES = 5 * 1024 * 1024;
+// Datasets cannot be deleted locally and each one stores its source, records and exports,
+// so the total stored source size (compact JSON) is capped to keep every browser save bounded.
+export const MAX_STORED_SOURCE_BYTES = 10 * 1024 * 1024;
+const compactBytes = source => new TextEncoder().encode(JSON.stringify(source)).length;
+const megabytes = bytes => (bytes / 1048576).toFixed(1);
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -111,7 +116,8 @@ export async function handle({ path, method, body = {} }, { state, user, users, 
   }
   if (path === '/api/datasets' && method === 'POST') {
     if (typeof body.source !== 'string') fail('GeoJSON must be supplied as text');
-    if (new TextEncoder().encode(body.source).length > MAX_BYTES) fail('File exceeds the 5 MB limit');
+    const uploadBytes = new TextEncoder().encode(body.source).length;
+    if (uploadBytes > MAX_BYTES) fail('File exceeds the 5 MB limit');
     let source;
     try { source = JSON.parse(body.source); } catch { fail('File is not valid JSON'); }
     if (!object(source) || source.type !== 'FeatureCollection' || !Array.isArray(source.features)) fail('Expected a GeoJSON FeatureCollection with a features array');
@@ -124,9 +130,15 @@ export async function handle({ path, method, body = {} }, { state, user, users, 
     const existing = state.datasets.find(item => item.user_id === user.id && item.source_fingerprint === fingerprint);
     if (existing) return { dataset: summary(existing, users), duplicate: true };
     if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 120) fail('Dataset name must contain 1 to 120 characters');
+    // Datasets saved before source_bytes existed are measured once and keep the result.
+    for (const item of state.datasets) item.source_bytes ??= compactBytes(item.source);
+    const storedBytes = state.datasets.reduce((total, item) => total + item.source_bytes, 0);
+    const sourceBytes = compactBytes(source);
+    if (storedBytes + sourceBytes > MAX_STORED_SOURCE_BYTES) fail(`This ${megabytes(sourceBytes)} MB dataset would bring stored datasets to ${megabytes(storedBytes + sourceBytes)} MB, over the ${megabytes(MAX_STORED_SOURCE_BYTES)} MB local storage budget (${megabytes(storedBytes)} MB already stored). Export a backup and reset demo data to upload more.`);
     // Yield before bounded local processing so the busy state can paint.
     await new Promise(resolve => setTimeout(resolve, 0));
     const item = dataset({ id: state.nextId, name: body.name.trim(), source, userId: user.id, attributes, time: now() });
+    item.source_bytes = sourceBytes;
     state.nextId += 1;
     state.datasets.push(item);
     return { dataset: summary(item, users), duplicate: false };

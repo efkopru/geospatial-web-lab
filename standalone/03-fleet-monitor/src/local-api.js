@@ -131,6 +131,12 @@ export function controlReplay(state, action, speed) {
   return replay;
 }
 
+// A restored replay starts paused. Without this, a tab that already holds the replay lock
+// would resume a backup's running replay as soon as the restored state is broadcast.
+export function prepareRestore(state) {
+  if (state.replay.running) controlReplay(state, 'pause');
+}
+
 export function handle({ path, method = 'GET', body = {} }, { state, now, fail, requireStaff }) {
   if (path === '/api/fleet' && method === 'GET') return { replay: { ...state.replay, available: playbackAvailable, reason: playbackReason }, vehicles: state.vehicles.map(vehiclePayload), geofences: state.geofences, events: state.events.slice(-100).reverse(), history_limit: HISTORY_LIMIT, event_limit: EVENT_LIMIT };
   if (path === '/api/fleet/control' && method === 'POST') {

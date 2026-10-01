@@ -47,9 +47,21 @@ Visual evidence in ignored `.runtime/`: `parcels-desktop.png`, `parcels-mobile.p
 - A service-request database backup restored successfully into a new temporary database. All eight issues present at backup time were restored, record counts matched, and spatial validity queries passed. The successful verification database was removed afterward. The backup excludes the administrator-owned PostGIS reference table data.
 - CI configuration parses and includes backend tests, React tests, builds, and real browser workflows. CI and Docker PostgreSQL clients are explicitly version 17 to match the supplied PostGIS 17 container.
 
+## Container verification (October 1, 2026)
+
+The [container workflow](.github/workflows/containers.yml) ran `scripts/container-smoke.sh` for all five projects on GitHub Actions (`ubuntu-24.04`, [run 36921811790](https://github.com/efkopru/geospatial-web-lab/actions/runs/36921811790)). Every project built its backend and frontend images and started PostGIS, Redis, migrations, the API, the Sidekiq worker and nginx. Each project then passed these checks:
+
+- migrations completed as the restricted application role
+- the frontend bundle, `/up` and `/api/session` responded through nginx
+- `db:seed` loaded inside the API container
+- a Sidekiq process registered in Redis
+- the API, worker and web containers ran without restarts
+
+This covers container build and startup on a CI runner. It does not cover a hosted deployment, TLS, or long-running operation.
+
 ## Boundaries
 
-Docker Desktop's engine failed to start in this environment. Container image builds and container runtime execution are **not verified** here. The same applications were run and tested directly in WSL. At the time of this local audit, the workspace had not yet been published and remote CI had not run. Subsequent CI results are recorded in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions). No public application hosting was created.
+Docker Desktop's engine failed to start in the original audit environment, so container image builds and runtime execution were **not verified** locally. They were later verified on GitHub Actions; see [Container verification](#container-verification-october-1-2026). The same applications were run and tested directly in WSL. At the time of this local audit, the workspace had not yet been published and remote CI had not run. Subsequent CI results are recorded in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions). No public application hosting was created.
 
 The ArcGIS basemap and SDK asset delivery need internet access. Business records remain in the local application databases. Cesium corridor data and elevations are synthetic, with no terrain-service token required. Browser rendering requires WebGL.
 

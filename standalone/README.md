@@ -44,7 +44,15 @@ Role checks demonstrate the original workflow: reporters have restricted request
 
 Each application uses a separate IndexedDB database. Changes persist across reloads on the same browser profile and origin. `localhost`, `127.0.0.1`, different ports and a hosted site are different origins, so they have separate data. An app running in development and the same app inside the built gallery can therefore show different local records. Data is not synchronized with the full-stack databases or other devices.
 
-**Export local backup** downloads the current app's stored state as JSON. **Backup restoration/import is not implemented.** The file is an inspectable archive of local records, not an automatic restore package. App-specific GeoJSON, JSON and CSV export buttons produce the workflow outputs described in each app's README.
+**Export local backup** downloads the current app's stored state as JSON. **Restore local backup** reads such a file and, after confirmation, replaces only that app's local data with the backup's state. A restore accepts only a backup that meets all of these conditions:
+
+- exported by the same app
+- uses the current backup version
+- has the expected top-level structure
+- each record of a seeded record type has the fields the app reads, with the expected value types
+- the file is at most 120 MB
+
+Rejected files leave local data unchanged. A restore replaces the whole local dataset; it does not merge records. Other open tabs of the app receive the restored state. A restored Fleet Monitor replay starts paused. The backup controls are disabled while a restore or reset is running. Backups are written as compact JSON. Indented backups from earlier exports can still be restored. App-specific GeoJSON, JSON and CSV export buttons produce the workflow outputs described in each app's README.
 
 **Reset demo data** asks for confirmation and then replaces only that standalone app's data with its initial synthetic dataset. It leaves the other standalone apps and the original full-stack databases unchanged. Browser site-data clearing, private browsing and storage eviction can also remove records.
 
@@ -82,6 +90,14 @@ node scripts/serve.mjs preview
 
 Open [the local gallery](http://127.0.0.1:5270/). Use either this gallery-only command or the combined preview launcher, because both use port 5270. Servers bind to `127.0.0.1`. Relative build paths let the gallery and its app subdirectories be served together by static hosting. Building static files does not publish them or establish a GitHub Pages deployment.
 
+## Publishing a static demo
+
+The manual [Publish standalone demo](../.github/workflows/standalone-pages.yml) workflow tests and builds the suite, checks the built gallery through the local preview server, uploads `standalone/dist` to GitHub Pages and then checks the deployed URL. It runs only when started from the Actions tab, because publishing makes the browser editions public. Before the first run, set **Settings > Pages > Source** to **GitHub Actions**. Pages for a private repository requires a GitHub plan that supports it.
+
+`npm run verify:site -- <url>` checks any served copy of the build, local or hosted. It confirms that the gallery links all five apps and that each app's scripts, styles, icon and third-party notices are served with the expected content types. It also checks the Cesium assets for app 05 and the license copies at the gallery root. A host that answers missing files with its HTML page fails the check. The script does not open a browser, so IndexedDB persistence, WebGL rendering, ArcGIS basemaps and downloads still need a manual check on the deployed URL (see [VERIFICATION.md](VERIFICATION.md)). On a public host, the gallery and app shells hide the links to the local full-stack apps.
+
+`node scripts/benchmark.mjs` measures the local adapters at their storage limits; the latest results are in [VERIFICATION.md](VERIFICATION.md#performance-baseline-october-1-2026).
+
 Generated `dist`, dependency directories and local output are excluded by this suite's `.gitignore`. Commit source and lockfiles; rebuild static files when preparing a deployment. [Third-party notices](THIRD_PARTY_NOTICES.md) and license copies are included with the app builds and assembled gallery.
 
 ## Verification commands
@@ -90,6 +106,7 @@ Generated `dist`, dependency directories and local output are excluded by this s
 npm test
 npm run test:ui
 npm run build
+npm run verify:site -- http://127.0.0.1:5270/   # while node scripts/serve.mjs preview is running
 ```
 
 Domain and shared-runtime tests cover calculations, validation, simulated permissions, persistence behavior and replay coordination. Interface tests and production builds cover different concerns; none substitutes for browser inspection of WebGL rendering and actual workflows. If a restricted Windows shell prevents Node's test runner from spawning subprocesses, use `node --test --test-isolation=none tests/*.test.js` for the Node test suite.

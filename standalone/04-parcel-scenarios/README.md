@@ -9,11 +9,11 @@ Follow the [suite setup instructions](../README.md). From `standalone`, `npm run
 - Browse 24 synthetic parcels in two districts. Select them on the map or in the table, select all visible parcels, or clear the selection. Changing districts does not silently discard an existing selection.
 - Set a name, 1 to 30 floors, 5% to 80% coverage and a 400 to 3,000 square-foot unit area. Invalid, repeated and unknown parcel IDs are rejected.
 - Calculate gross floor area, residential floor area, estimated units, open space, floor-area ratio and synthetic height-limit warnings immediately in the browser.
-- Save scenarios for the selected demo user. Seeded examples belong to Alex Morgan. Switching to another user changes the visible scenario collection.
+- Save scenarios for the selected demo user, up to 200 saved scenarios per user in this browser. Each save rewrites the whole local dataset, so the limit keeps saves fast. Delete your own scenarios to save more; other users' scenarios do not count toward your limit. Seeded examples belong to Alex Morgan. Switching to another user changes the visible scenario collection.
 - Compare up to four completed scenarios using unit-capacity and open-space charts.
 - Recalculate a saved scenario with its existing assumptions. This browser action increments its calculation revision. Save another scenario to compare different assumptions.
 - Download a JSON export containing assumptions, calculated results, geometry snapshots, area method and synthetic-data provenance. Delete unwanted local scenarios.
-- Use the shared browser controls to export a backup or reset local demo data.
+- Use the shared browser controls to export or restore a backup, or reset local demo data.
 
 ## Spatial and numerical method
 
@@ -36,7 +36,7 @@ Sines receive angles in radians. Displayed acres round to two decimal places; ca
 
 Demo-user ownership is enforced by the local adapter to demonstrate application behavior. It is not authentication or a security boundary: a person controlling the browser can inspect its storage. There is no shared database, durable background queue or collaboration across devices. The original full-stack edition remains the implementation of those backend features.
 
-ArcGIS SDK assets and basemaps require a network connection. Local records and calculations do not require an application server. Browser clearing or private browsing can remove local records; the shared backup export preserves an inspectable JSON archive, but automatic backup restoration/import is not implemented.
+ArcGIS SDK assets and basemaps require a network connection. Local records and calculations do not require an application server. Browser clearing or private browsing can remove local records; the shared backup export preserves an inspectable JSON archive that the shared restore control can load again.
 
 ## Tests
 

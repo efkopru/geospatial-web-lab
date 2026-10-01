@@ -14,8 +14,8 @@ Follow the [suite setup instructions](../README.md). From `standalone`, `npm run
 - Use a staff demo role to resolve or reopen observations with explanatory notes. Every change appends an actor, action and timestamp to the local history.
 - Reject stale status changes using a version number. A form opened before another accepted edit must reload before it can write again.
 - Generate an actual 71-point corridor profile in the browser, inspect its chart and sample table, and download its GeoJSON.
-- Review the ten most recent profile runs. Completed runs preserve the source asset snapshot and remain independent of subsequent observations or source changes.
-- Export a browser backup or reset the demo from the shared controls.
+- Review the ten most recent profile runs. The browser keeps the newest 20 completed runs and removes older completed runs so each save stays small. Failed or pending runs are kept so they can be retried. A tab that still shows a removed run reports that it was not found. Completed runs preserve the source asset snapshot and remain independent of subsequent observations or source changes.
+- Export or restore a browser backup, or reset the demo from the shared controls.
 
 ## Profile mathematics
 
@@ -31,7 +31,7 @@ Profile generation runs immediately in the browser. It does not queue work on a 
 
 Observations and profile runs are shared among the three demo users within this app's browser store, matching the shared asset-register workflow. Only staff demo roles can change observation status. This is role simulation, not authentication: anyone controlling the browser can inspect or modify its storage. The original full-stack app retains server authorization and database audit controls.
 
-The Cesium scene uses synthetic asset surfaces and requires WebGL. It does not require an external terrain token. Browser storage can be cleared or evicted; the shared backup export preserves an inspectable JSON archive, but automatic backup restoration/import is not implemented. The shared runtime controls persistence, reset and browser-tab coordination.
+The Cesium scene uses synthetic asset surfaces and requires WebGL. It does not require an external terrain token. Browser storage can be cleared or evicted; the shared backup export preserves an inspectable JSON archive that the shared restore control can load again. The shared runtime controls persistence, reset and browser-tab coordination.
 
 ## Tests
 

@@ -12,7 +12,7 @@ Use the commands and ports in the [standalone suite README](../README.md). Open 
 4. Add a named rectangular zone by specifying west, south, east, and north bounds. A point on an edge or vertex counts as inside. Membership is evaluated on the next telemetry sample; creating a zone does not retroactively change history.
 5. Filter the latest 100 events to the selected vehicle or all vehicles. An event is recorded only when membership changes, including the first recorded point inside a zone.
 6. Pause to inspect a frame. Reset replay to clear telemetry, membership, and events while retaining custom zones and the speed setting. Removing a zone also removes its memberships and associated events.
-7. Use the shared backup control to download JSON. Automatic restoration/import of backup files is not implemented. The shared reset control restores the entire application's original synthetic state, including default zones.
+7. Use the shared backup control to download JSON, and **Restore local backup** to load it again. The restoring page reloads; as with reopening, a newly acquired replay leader pauses a restored running replay until Start replay is pressed. The shared reset control restores the entire application's original synthetic state, including default zones.
 
 ## Preserved behavior
 
