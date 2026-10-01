@@ -13,7 +13,7 @@ Follow the [suite setup instructions](../README.md). From `standalone`, `npm run
 - Compare up to four completed scenarios using unit-capacity and open-space charts.
 - Recalculate a saved scenario with its existing assumptions. This browser action increments its calculation revision. Save another scenario to compare different assumptions.
 - Download a JSON export containing assumptions, calculated results, geometry snapshots, area method and synthetic-data provenance. Delete unwanted local scenarios.
-- Use the shared browser controls to export a backup or reset local demo data.
+- Use the shared browser controls to export or restore a backup, or reset local demo data.
 
 ## Spatial and numerical method
 
@@ -36,7 +36,7 @@ Sines receive angles in radians. Displayed acres round to two decimal places; ca
 
 Demo-user ownership is enforced by the local adapter to demonstrate application behavior. It is not authentication or a security boundary: a person controlling the browser can inspect its storage. There is no shared database, durable background queue or collaboration across devices. The original full-stack edition remains the implementation of those backend features.
 
-ArcGIS SDK assets and basemaps require a network connection. Local records and calculations do not require an application server. Browser clearing or private browsing can remove local records; the shared backup export preserves an inspectable JSON archive, but automatic backup restoration/import is not implemented.
+ArcGIS SDK assets and basemaps require a network connection. Local records and calculations do not require an application server. Browser clearing or private browsing can remove local records; the shared backup export preserves an inspectable JSON archive that the shared restore control can load again.
 
 ## Tests
 

@@ -206,3 +206,96 @@ test('BFCache restoration reloads and disposal removes lifecycle listeners', asy
   runtime.dispose();
   assert.equal(listeners.size, 0);
 });
+
+test('a backup restores into a fresh database as a new revision and notifies other tabs', async () => {
+  const source = setup({ id: 'restore' }).runtime;
+  const listeners = [];
+  class Channel { constructor() { this.onmessage = null; listeners.push(this); } postMessage() { for (const other of listeners) if (other !== this) other.onmessage?.({}); } close() {} }
+  const indexedDB = new IDBFactory();
+  const target = setup({ id: 'restore', indexedDB, environment: { BroadcastChannel: Channel } }).runtime;
+  const otherTab = setup({ id: 'restore', indexedDB, environment: { BroadcastChannel: Channel } }).runtime;
+  try {
+    await Promise.all([source.ready, target.ready, otherTab.ready]);
+    await source.request('/items', { method: 'POST', body: { value: 'backed up' } });
+    const backup = JSON.parse(JSON.stringify(await source.backup()));
+    await target.request('/items', { method: 'POST', body: { value: 'local edit' } });
+    await target.request('/items', { method: 'POST', body: { value: 'second local edit' } });
+    const before = await new LocalStore('restore', { indexedDB, locks: undefined }).get();
+    let otherTabUpdated = false;
+    otherTab.subscribe(type => { if (type === 'data') otherTabUpdated = true; });
+    await target.restore(backup);
+    assert.deepEqual(target.read(), { items: [{ owner: 1, value: 'backed up' }], total: 1 });
+    assert.equal(target.revision, 1);
+    const after = await new LocalStore('restore', { indexedDB, locks: undefined }).get();
+    assert.equal(after._revision, before._revision + 1);
+    assert.equal(after.version, 1);
+    assert.equal(after.app, 'restore');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(otherTabUpdated, true);
+    assert.equal(otherTab.read().items[0].value, 'backed up');
+  } finally { source.dispose(); target.dispose(); otherTab.dispose(); }
+});
+
+test('restore rejects foreign, unsupported, malformed or mismatched backups without changing stored data', async () => {
+  const { runtime, storage } = setup({ id: 'guarded' });
+  try {
+    await runtime.ready;
+    await runtime.request('/items', { method: 'POST', body: { value: 'keep me' } });
+    const good = await runtime.backup();
+    const committed = await storage.get();
+    const cases = [
+      [null, /not a standalone backup/],
+      [{ ...good, format: 'something-else' }, /not a standalone backup/],
+      [{ ...good, app: 'other-app' }, /belongs to other-app/],
+      [{ ...good, version: 2 }, /version 2 is not supported/],
+      [{ ...good, state: [] }, /no stored state/],
+      [{ ...good, state: { items: [] } }, /"total" should be number, not missing/],
+      [{ ...good, state: { items: {}, total: 0 } }, /"items" should be array, not object/],
+      [{ ...good, state: { items: ['text'], total: 1 } }, /"items" contains invalid records/],
+      [{ ...good, state: { items: [], total: null } }, /"total" should be number, not null/]
+    ];
+    for (const [value, message] of cases) await assert.rejects(runtime.restore(value), message);
+    assert.deepEqual(await storage.get(), committed);
+    assert.equal(runtime.revision, 0);
+  } finally { runtime.dispose(); }
+});
+
+test('restore enforces a matching schema_version and recovers an incompatible saved envelope', async () => {
+  const indexedDB = new IDBFactory();
+  const storage = new LocalStore('schema', { indexedDB, locks: undefined });
+  await storage.put({ version: 999, app: 'schema', state: { legacy: true }, _revision: 4 });
+  const runtime = createRuntime({ id: 'schema', seed: () => ({ schema_version: 2, rows: [] }), handle: adapter, store: storage, environment: {} });
+  try {
+    await runtime.ready;
+    assert.match(runtime.meta.error, /incompatible/);
+    const backup = { format: 'geospatial-web-lab-standalone-backup', app: 'schema', version: 1, state: { schema_version: 1, rows: [] } };
+    await assert.rejects(runtime.restore(backup), /schema 1 does not match this edition's schema 2/);
+    await runtime.restore({ ...backup, state: { schema_version: 2, rows: [{ id: 1 }] } });
+    assert.deepEqual((await storage.get()).state, { schema_version: 2, rows: [{ id: 1 }] });
+    assert.equal((await storage.get())._revision, 5);
+  } finally { runtime.dispose(); }
+});
+
+test('each standalone app restores its own backup and rejects a backup from another app', async () => {
+  const apps = ['01-service-requests', '02-data-quality-portal', '03-fleet-monitor', '04-parcel-scenarios', '05-infrastructure-inspections'];
+  const backups = new Map();
+  for (const app of apps) {
+    const { seed, handle } = await import(`../${app}/src/local-api.js`);
+    const runtime = createRuntime({ id: app, seed, handle, store: new LocalStore(app, { indexedDB: new IDBFactory(), locks: undefined }), environment: {} });
+    try {
+      await runtime.ready;
+      const backup = JSON.parse(JSON.stringify(await runtime.backup()));
+      await runtime.restore(backup);
+      assert.deepEqual(runtime.read(), backup.state, app);
+      backups.set(app, backup);
+    } finally { runtime.dispose(); }
+  }
+  const { seed, handle } = await import('../04-parcel-scenarios/src/local-api.js');
+  const parcels = createRuntime({ id: '04-parcel-scenarios', seed, handle, store: new LocalStore('parcels-cross', { indexedDB: new IDBFactory(), locks: undefined }), environment: {} });
+  try {
+    await parcels.ready;
+    await assert.rejects(parcels.restore(backups.get('05-infrastructure-inspections')), /belongs to 05-infrastructure-inspections/);
+    // Relabelling another app's file still fails the shape check against this app's seed.
+    await assert.rejects(parcels.restore({ ...backups.get('05-infrastructure-inspections'), app: '04-parcel-scenarios' }), /"parcels" should be array, not missing/);
+  } finally { parcels.dispose(); }
+});

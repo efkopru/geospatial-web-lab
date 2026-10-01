@@ -6,6 +6,24 @@ export const USERS=Object.freeze([
 ]);
 export function fail(message,status=422){const error=new Error(message);error.status=status;throw error;}
 const copy=value=>value===undefined?undefined:structuredClone(value);
+export const BACKUP_FORMAT='geospatial-web-lab-standalone-backup';
+const kind=value=>value===null?'null':Array.isArray(value)?'array':typeof value;
+// A backup must come from this app, use the current envelope version and match the
+// top-level shape of a freshly seeded state, so a restore cannot load another app's records.
+export function checkBackup(value,id,reference){
+ if(kind(value)!=='object'||value.format!==BACKUP_FORMAT)fail('This file is not a standalone backup. Choose a file saved with Export local backup.');
+ if(value.app!==id)fail(`This backup belongs to ${typeof value.app==='string'?value.app:'another app'}, not ${id}.`);
+ if(value.version!==1)fail(`Backup version ${value.version} is not supported by this edition.`);
+ const state=value.state;if(kind(state)!=='object')fail('The backup has no stored state.');
+ for(const [key,expected] of Object.entries(reference)){
+  const actual=kind(state[key]);
+  if(actual!==kind(expected))fail(`The backup field "${key}" should be ${kind(expected)}, not ${actual==='undefined'?'missing':actual}.`);
+  if(actual==='array'&&state[key].some(item=>kind(item)!=='object'))fail(`The backup field "${key}" contains invalid records.`);
+  if(actual==='number'&&!Number.isFinite(state[key]))fail(`The backup field "${key}" is not a finite number.`);
+ }
+ if('schema_version' in reference&&state.schema_version!==reference.schema_version)fail(`Backup schema ${state.schema_version} does not match this edition's schema ${reference.schema_version}.`);
+ return copy(state);
+}
 let active;
 export function getRuntime(){if(!active)throw new Error('Standalone application was not initialized.');return active;}
 export function configureStandalone(options){active?.dispose();active=createRuntime(options);return active;}
@@ -46,7 +64,10 @@ export function createRuntime({id,seed,handle,start,store=new LocalStore(id),env
    apply(valid(await store.get()));const draft=copy(state);return copy(await handle(request,context(draft,actor)));
   },
   async reset(){await runtime.ready;await store.exclusive(async()=>{const previous=await store.get();await persist(await seed(),previous?._revision||0);revision++;broadcast();notify('reset');});},
-  async backup(){await runtime.ready;const saved=await store.get();return {format:'geospatial-web-lab-standalone-backup',exportedAt:new Date().toISOString(),...copy(saved)};},
+  async backup(){await runtime.ready;const saved=await store.get();return {format:BACKUP_FORMAT,exportedAt:new Date().toISOString(),...copy(saved)};},
+  // Replaces this app's stored state with a validated backup in one revision-checked write.
+  async validateBackup(value){return checkBackup(value,id,await seed());},
+  async restore(value){await runtime.ready;const restored=await runtime.validateBackup(value);await store.exclusive(async()=>{const previous=await store.get();await persist(restored,previous?._revision||0);revision++;broadcast();notify('reset');});},
   dispose(){disposed=true;stop?.();channel?.close();store.close();listeners.clear();environment.removeEventListener?.('pagehide',unload);environment.removeEventListener?.('pageshow',restore);environment.document?.removeEventListener('click',downloadClick);}
  };
  const downloadClick=async event=>{

@@ -212,7 +212,7 @@ Keep map attribution visible. Identify the edition beside every image. Counts an
 | Standalone role simulation | Authentication or protected multi-user access |
 | Documented spherical approximations | Exact parity with PostGIS ellipsoidal calculations |
 | Synthetic parcel capacity and elevation examples | Permitting advice, measured terrain, or engineering clearance analysis |
-| JSON backup export | Implemented backup restoration or cloud synchronization |
+| Local JSON backup export and same-app restore | Cloud synchronization, cross-device sync, or record merging |
 | Static builds verified | A published GitHub Pages site or fully offline app |
 | Recorded tests and browser checks | Proven uptime, production scale, security certification, or business impact |
 
