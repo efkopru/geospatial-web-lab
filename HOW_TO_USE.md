@@ -193,7 +193,7 @@ With all five frontends, APIs, and workers running, execute `npm run test:e2e` f
 
 ## 7. Container setup
 
-Container configuration has been checked, but image builds and runtime execution were not verified because the local Docker engine was unavailable. The verified application runtime is WSL.
+Container configuration has been checked, but image builds and runtime execution were not verified locally because the local Docker engine was unavailable. The verified application runtime is WSL. The [container workflow](.github/workflows/containers.yml) builds and smoke-tests each stack on GitHub Actions with `scripts/container-smoke.sh`. You can run the same script locally, for example `bash scripts/container-smoke.sh 02-data-quality-portal`.
 
 With Docker available, from the chosen project folder:
 

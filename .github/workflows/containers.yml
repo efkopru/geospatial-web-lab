@@ -1,0 +1,63 @@
+name: Verify container images
+
+on:
+  push:
+    paths:
+      - '0[1-5]-*/backend/**'
+      - '0[1-5]-*/frontend/**'
+      - '0[1-5]-*/compose.yaml'
+      - '0[1-5]-*/.env.example'
+      - 'shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/Frontend.Dockerfile'
+      - 'scripts/nginx.conf'
+      - 'scripts/init-database.sh'
+      - 'scripts/configure-env.mjs'
+      - 'scripts/container-smoke.sh'
+      - '.github/workflows/containers.yml'
+  pull_request:
+    paths:
+      - '0[1-5]-*/backend/**'
+      - '0[1-5]-*/frontend/**'
+      - '0[1-5]-*/compose.yaml'
+      - '0[1-5]-*/.env.example'
+      - 'shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/Frontend.Dockerfile'
+      - 'scripts/nginx.conf'
+      - 'scripts/init-database.sh'
+      - 'scripts/configure-env.mjs'
+      - 'scripts/container-smoke.sh'
+      - '.github/workflows/containers.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: containers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Build and run ${{ matrix.project }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - 01-service-requests
+          - 02-data-quality-portal
+          - 03-fleet-monitor
+          - 04-parcel-scenarios
+          - 05-infrastructure-inspections
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build, start and check the Compose stack
+        run: bash scripts/container-smoke.sh ${{ matrix.project }}
