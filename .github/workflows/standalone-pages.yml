@@ -71,6 +71,18 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: standalone/scripts
+      # With "Deploy from a branch", GitHub's own branch build replaces this deployment
+      # with a Jekyll rendering of the repository a minute later.
+      - name: Check that Pages publishes from GitHub Actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          build_type="$(gh api "repos/$REPOSITORY/pages" --jq .build_type 2>/dev/null || true)"
+          if [ "$build_type" != "workflow" ]; then
+            echo "::error::GitHub Pages source is '${build_type:-not enabled}'. Set Settings > Pages > Build and deployment > Source to GitHub Actions, then rerun this workflow."
+            exit 1
+          fi
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
