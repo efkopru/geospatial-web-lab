@@ -2,7 +2,7 @@
 
 Five full-stack learning applications, each with its own Rails backend, React frontend, PostgreSQL/PostGIS database, API, tests, and Docker Compose configuration. The root npm workspace shares map, chart, authentication, and layout components without sharing application data.
 
-This is an **AI-assisted learning and portfolio project using synthetic application data**. Local verification uses real APIs, databases, and workers. Container builds and startup are verified in CI; public hosting remains unverified. Remote CI results are reported separately in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions).
+This is an **AI-assisted learning and portfolio project using synthetic application data**. Local verification uses real APIs, databases, and workers. Container builds and startup are verified in CI. The standalone browser editions are published at [https://efkopru.github.io/geospatial-web-lab/](https://efkopru.github.io/geospatial-web-lab/); the full-stack applications are not publicly hosted. Remote CI results are reported separately in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions).
 
 ## Documentation
 
@@ -127,7 +127,7 @@ The backend image pins Ruby 3.4 on Debian trixie and explicitly installs the Pos
 
 For a volume created by an older revision, first generate the new `APP_DATABASE_PASSWORD`, then run `docker compose up -d db` and `docker compose exec db bash /docker-entrypoint-initdb.d/20-geolab.sh` before starting the full stack. This idempotent administrator step grants the new application role ownership of existing application tables while leaving PostGIS extension objects with the administrator. Back up the database first; do not delete a volume to upgrade it.
 
-For an external deployment, provision HTTPS, set `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` to the real host, enable `SECURE_COOKIES`, configure trusted TLS termination and `FORCE_SSL` consistently, replace demo credentials, and keep secrets outside source control. The nginx configuration handles same-origin API requests and WebSocket upgrades. No public hosting has been created by this implementation.
+For an external deployment, provision HTTPS, set `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` to the real host, enable `SECURE_COOKIES`, configure trusted TLS termination and `FORCE_SSL` consistently, replace demo credentials, and keep secrets outside source control. The nginx configuration handles same-origin API requests and WebSocket upgrades. The full-stack applications have no public hosting.
 
 ## Verification
 
@@ -148,7 +148,7 @@ Backend suites exercise PostGIS operations, validation, ownership and staff perm
 
 Tests explicitly migrate their test databases. Rails automatic test schema replacement is disabled because a restricted app role must not drop/recreate the administrator-owned PostGIS extension. `db/structure.sql` captures native spatial/generated columns and database constraints.
 
-Browser tests add synthetic records to development databases. Docker image builds and container runtime could not be verified locally because the engine could not start. The [container workflow](.github/workflows/containers.yml) builds and smoke-tests each stack on GitHub Actions; all five passed on October 1, 2026 (see [VERIFICATION.md](VERIFICATION.md#container-verification-october-1-2026)). The [GitHub workflow](.github/workflows/ci.yml) repeats validation on pushes and pull requests; its run status is separate from the dated local results above. No public deployment exists. Successful builds and Compose parsing do not establish deployment readiness.
+Browser tests add synthetic records to development databases. Docker image builds and container runtime could not be verified locally because the engine could not start. The [container workflow](.github/workflows/containers.yml) builds and smoke-tests each stack on GitHub Actions; all five passed on October 1, 2026 (see [VERIFICATION.md](VERIFICATION.md#container-verification-october-1-2026)). The [GitHub workflow](.github/workflows/ci.yml) repeats validation on pushes and pull requests; its run status is separate from the dated local results above. The full-stack applications have no public deployment; only the standalone browser editions are published (see [standalone/README.md](standalone/README.md#publishing-a-static-demo)). Successful builds and Compose parsing do not establish deployment readiness.
 
 ## Backup and restore
 
@@ -175,4 +175,4 @@ Writing the dump inside the container and copying it preserves binary bytes on e
 
 Use [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) with the dated verification record. Identify synthetic data and the revision shown in screenshots or demonstrations. Parcel formulas and height warnings are planning exercises; interpolated corridor profiles are not measured terrain or engineering surveys. Fleet movement is simulated, with no guaranteed wall-clock delivery rate.
 
-WebGL and external ArcGIS basemap/asset access are required for full map rendering. No load-test result, independent security certification, real-world adoption, or business outcome is claimed. Private repository publication does not establish a redistribution license or a public deployment.
+WebGL and external ArcGIS basemap/asset access are required for full map rendering. No load-test result, independent security certification, real-world adoption, or business outcome is claimed. The repository is public, but it has no license file, so public source does not grant a redistribution license.

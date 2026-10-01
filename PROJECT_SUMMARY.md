@@ -56,13 +56,13 @@ Additional checks cover production eager loading, restricted-role migrations, Co
 
 ## Current delivery boundaries
 
-Applications ran directly in WSL. Docker builds and execution were not verified locally because the engine was unavailable; all five stacks later built and passed a container smoke test on GitHub Actions. Remote CI status is available in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions), separately from the recorded local checks. No public application deployment exists. Frontend builds establish compilation, not deployment.
+Applications ran directly in WSL. Docker builds and execution were not verified locally because the engine was unavailable; all five stacks later built and passed a container smoke test on GitHub Actions. Remote CI status is available in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions), separately from the recorded local checks. The full-stack applications have no public deployment; the standalone browser editions are published at https://efkopru.github.io/geospatial-web-lab/. Frontend builds establish compilation, not deployment.
 
 ArcGIS basemaps and SDK assets require internet access. Cesium uses synthetic elevations and local assets without a terrain-service token. The 3D view requires WebGL. Imports and histories are bounded. Recorded baselines cover the [standalone editions](standalone/VERIFICATION.md#performance-baseline-october-1-2026) and the [full-stack APIs and workers](VERIFICATION.md#full-stack-performance-october-1-2026). Both are single-machine measurements on synthetic data, not capacity guarantees.
 
 ## Copy-ready portfolio text
 
-> Geospatial Web Lab is an AI-assisted learning project comprising five Rails and React applications with PostgreSQL/PostGIS, ArcGIS, and CesiumJS. It explores mapped service requests, GeoJSON quality review, simulated fleet monitoring, parcel calculations, and 3D inspections. The implementation includes authenticated APIs, background jobs, live updates, reproducible exports, and regression tests. Recorded local verification covers 109 backend tests, 44 frontend tests, 13 browser scenarios, and five frontend builds. Public deployment remains future work.
+> Geospatial Web Lab is an AI-assisted learning project comprising five Rails and React applications with PostgreSQL/PostGIS, ArcGIS, and CesiumJS. It explores mapped service requests, GeoJSON quality review, simulated fleet monitoring, parcel calculations, and 3D inspections. The implementation includes authenticated APIs, background jobs, live updates, reproducible exports, and regression tests. Recorded local verification covers 109 backend tests, 44 frontend tests, 13 browser scenarios, and five frontend builds. Standalone browser editions are published as a static demo; the full-stack applications are not publicly hosted.
 
 - Implemented workflows connect spatial databases, background processing, and linked map interfaces.
 - Two audit passes addressed session revocation, asynchronous failure handling, stale edits, and spatial edge cases.
