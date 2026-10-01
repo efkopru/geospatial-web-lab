@@ -59,55 +59,73 @@ These captures show synthetic acceptance-test data saved in the local gallery's 
 
 ## Performance baseline (October 1, 2026)
 
-`node scripts/benchmark.mjs` runs the real app adapters through the shared runtime: state clone, handler, envelope and IndexedDB write. It uses fake-indexeddb in Node and reports the median of five runs. Inputs are built before timing starts. It was run on Linux with Node.js 22 on a cloud Intel Xeon 2.8 GHz container. Absolute times differ between machines and browsers. The useful result is how cost grows with stored data. Every change rewrites the app's whole stored state, so a save gets slower as that state grows, while the domain logic itself stays fast. For example, JSTS validation of 2,000 polygons with 64 vertices each takes about 1 s by itself.
+`node scripts/benchmark.mjs` runs the real app adapters through the shared runtime and its IndexedDB storage. It uses fake-indexeddb in Node and reports the median of five runs. Inputs are built before timing starts. It was run on Linux with Node.js 22 on a cloud Intel Xeon 2.8 GHz container. Absolute times differ between machines and browsers.
+
+### Record-level storage
+
+Until this change, each app kept its whole state as one IndexedDB record. Every change cloned, rewrote and re-read that record, so save time grew with all stored data. A 1 KB Data Quality upload took about 2 s in Chromium once 30 MB were stored.
+
+The storage now works differently:
+
+- **Separate entries.** Each top-level field is stored separately. An array of records with unique ids is stored one IndexedDB entry per record.
+- **In-memory state.** The runtime keeps the committed state in memory, frozen. Before each request it checks only the stored revision, and reloads only after another tab has written.
+- **Copy-on-write drafts.** Handlers run on an [Immer](https://immerjs.github.io/immer/) draft. A change shares every untouched record with the committed state.
+- **Small writes.** A save writes only the records and fields that changed, plus the revision. The same revision check still stops one tab from overwriting another's newer data.
+- **Migration.** Databases from the previous layout are migrated when they are opened.
+
+Current Node results:
 
 | App | Operation | Data size | Stored state after the runs | Median |
 | --- | --- | --- | ---: | ---: |
-| 01 Civic Works | Create one request | 6 requests | 4 KB | 0.9 ms |
-| 01 Civic Works | List with 1 km distance filter | 6 requests | 4 KB | 0.6 ms |
-| 01 Civic Works | Import 500 point features | 6 requests | 745 KB | 59.9 ms |
-| 01 Civic Works | Generate CSV export | 6 requests | 1,975 KB | 93.2 ms |
-| 01 Civic Works | Create one request | 1000 requests | 371 KB | 22.5 ms |
-| 01 Civic Works | List with 1 km distance filter | 1000 requests | 371 KB | 14.2 ms |
-| 01 Civic Works | Import 500 point features | 1000 requests | 1,119 KB | 78.6 ms |
-| 01 Civic Works | Generate CSV export | 1000 requests | 2,885 KB | 111.4 ms |
-| 01 Civic Works | Create one request | 2500 requests | 929 KB | 66.9 ms |
-| 01 Civic Works | List with 1 km distance filter | 2500 requests | 929 KB | 37.2 ms |
-| 01 Civic Works | Generate CSV export | 2500 requests | 2,211 KB | 77.1 ms |
-| 01 Civic Works | Create one request | 4500 requests | 1,672 KB | 130.7 ms |
-| 01 Civic Works | List with 1 km distance filter | 4500 requests | 1,672 KB | 59.5 ms |
-| 01 Civic Works | Generate CSV export | 4500 requests | 3,987 KB | 151.0 ms |
-| 02 Data Quality | Validate upload | 500 polygons x 16 vertices (327 KB) | 1,037 KB | 105.7 ms |
-| 02 Data Quality | Validate upload | 2000 polygons x 16 vertices (1311 KB) | 4,127 KB | 281.8 ms |
-| 02 Data Quality | Validate upload | 2000 polygons x 64 vertices (4974 KB) | 15,114 KB | 809.2 ms |
-| 02 Data Quality | Small upload at the stored-upload budget | 4 datasets, 2 x 4.9 MB uploads | 30,286 KB | 3654.0 ms |
-| 03 Fleet Monitor | Replay tick (10 vehicles) | empty history | 27 KB | 5.3 ms |
-| 03 Fleet Monitor | Replay tick (10 vehicles) | history at 360 points per vehicle | 549 KB | 55.8 ms |
-| 04 Parcel Scenarios | Save one scenario | 2 saved scenarios | 17 KB | 3.5 ms |
-| 04 Parcel Scenarios | Save one scenario | 102 saved scenarios | 192 KB | 87.3 ms |
-| 04 Parcel Scenarios | Save one scenario | 302 saved scenarios | 542 KB | 197.5 ms |
-| 04 Parcel Scenarios | Save one scenario | 595 saved scenarios | 1,054 KB | 411.8 ms |
-| 05 Inspections | Generate 71-sample profile | 0 stored profile runs | 47 KB | 4.0 ms |
-| 05 Inspections | Generate 71-sample profile | 20 stored profile runs | 179 KB | 24.0 ms |
+| 01 Civic Works | Create one request | 6 requests | 4 KB | 1.0 ms |
+| 01 Civic Works | List with 1 km distance filter | 6 requests | 4 KB | 0.7 ms |
+| 01 Civic Works | Import 500 point features | 6 requests | 745 KB | 47.4 ms |
+| 01 Civic Works | Generate CSV export | 6 requests | 1,975 KB | 23.2 ms |
+| 01 Civic Works | Create one request | 1000 requests | 371 KB | 1.5 ms |
+| 01 Civic Works | List with 1 km distance filter | 1000 requests | 371 KB | 3.0 ms |
+| 01 Civic Works | Import 500 point features | 1000 requests | 1,119 KB | 39.2 ms |
+| 01 Civic Works | Generate CSV export | 1000 requests | 2,885 KB | 25.4 ms |
+| 01 Civic Works | Create one request | 2500 requests | 929 KB | 2.8 ms |
+| 01 Civic Works | List with 1 km distance filter | 2500 requests | 929 KB | 5.9 ms |
+| 01 Civic Works | Generate CSV export | 2500 requests | 2,211 KB | 17.3 ms |
+| 01 Civic Works | Create one request | 4500 requests | 1,672 KB | 6.0 ms |
+| 01 Civic Works | List with 1 km distance filter | 4500 requests | 1,672 KB | 8.9 ms |
+| 01 Civic Works | Generate CSV export | 4500 requests | 3,987 KB | 30.4 ms |
+| 02 Data Quality | Validate upload | 500 polygons x 16 vertices (327 KB) | 1,037 KB | 117.8 ms |
+| 02 Data Quality | Validate upload | 2000 polygons x 16 vertices (1311 KB) | 4,127 KB | 368.7 ms |
+| 02 Data Quality | Validate upload | 2000 polygons x 64 vertices (4974 KB) | 15,114 KB | 1057.9 ms |
+| 02 Data Quality | Small upload at the stored-upload budget | 4 datasets, 2 x 4.9 MB uploads | 30,286 KB | 2.1 ms |
+| 03 Fleet Monitor | Replay tick (10 vehicles) | empty history | 27 KB | 4.2 ms |
+| 03 Fleet Monitor | Replay tick (10 vehicles) | history at 360 points per vehicle | 549 KB | 14.1 ms |
+| 04 Parcel Scenarios | Save one scenario | 2 saved scenarios | 17 KB | 1.0 ms |
+| 04 Parcel Scenarios | Save one scenario | 102 saved scenarios | 192 KB | 1.3 ms |
+| 04 Parcel Scenarios | Save one scenario | 302 saved scenarios | 542 KB | 1.8 ms |
+| 04 Parcel Scenarios | Save one scenario | 2995 saved scenarios | 5,256 KB | 8.0 ms |
+| 05 Inspections | Generate 71-sample profile | 0 stored profile runs | 47 KB | 1.5 ms |
+| 05 Inspections | Generate 71-sample profile | 20 stored profile runs | 179 KB | 1.2 ms |
 
-A Chromium 141 spot check used real IndexedDB and the same adapters, loaded through the Vite development servers. Inputs were built before timing, and each figure is the median of five runs, except the single first upload:
+Chromium 141 spot check, with real IndexedDB and the same adapters loaded through the Vite development servers (medians of five runs, single runs for uploads and reopening):
 
-| App | Operation | Data size | Median |
-| --- | --- | --- | ---: |
-| 04 Parcel Scenarios | Save one scenario | 2 / 302 / 595 saved scenarios across three demo users | 11.6 / 157.7 / 268.0 ms |
-| 05 Inspections | Generate 71-sample profile | 0 / 20 stored profile runs | 6.2 / 13.8 ms |
-| 02 Data Quality | First 2,000-polygon x 64-vertex upload (4.9 MB) | Seeded datasets only | 945.0 ms |
-| 02 Data Quality | Small upload with 2 x 4.9 MB uploads stored (30 MB state) | 4 datasets | 2,083.9 ms |
+| App | Operation | Data size | Whole-record storage | Record-level storage |
+| --- | --- | --- | ---: | ---: |
+| 02 Data Quality | Small upload | 2 x 4.9 MB uploads stored (30 MB state) | 2,083.9 ms | 2.8–5.2 ms |
+| 02 Data Quality | First 2,000-polygon x 64-vertex upload (4.9 MB) | Seeded datasets only | 945.0 ms | 1,328.6–1,656.3 ms |
+| 02 Data Quality | Open the app | 30 MB state | — | 479.8–1,021.2 ms |
+| 04 Parcel Scenarios | Save one scenario | 595 saved scenarios | 268.0 ms | 7.2–17.8 ms |
 
-Before these limits were added, the same checks found unbounded growth. In Chromium, a parcel save took 0.94 s with 2,000 saved scenarios and a profile run took 0.65 s with 500 stored runs. A small data-quality upload took 4.1 s with 56 MB of stored datasets. The standalone editions now enforce these limits:
+Ranges are two separate runs. The first large upload is somewhat slower because the new dataset is frozen once as it enters the committed state.
 
-- **Parcel scenarios:** at most 200 saved scenarios per demo user, so at most about 600 in the browser. Each user frees space by deleting their own scenarios, and another user's scenarios never block a save.
-- **Profile runs:** only the newest 20 completed runs are kept. Failed or pending runs are kept so they can be retried, and the workspace lists the newest 10.
-- **Data Quality Portal:** stored sources may total at most 10 MB, measured as compact JSON, so indentation in an uploaded file does not count. The 5 MB per-file limit still applies. Each dataset stores its source, validated records and export snapshot, so stored state is about three times the source size. At the full budget, every change in this app takes about 2 s in Chromium.
+### Limits
 
-Civic Works already capped requests (5,000), imports (100) and retained CSV exports (30). The Fleet Monitor already capped history at 360 points per vehicle and 500 events. Geofences, inspection observations and their histories have no limit; they grow one user action at a time.
+These limits remain:
 
-These numbers describe single-tab browser work on synthetic data. They are not load tests of the full-stack services. Full-stack throughput, PostGIS query cost and Action Cable fan-out remain unmeasured.
+- **Parcel scenarios:** at most 1,000 per demo user, raised from 200. Saves no longer depend on how many scenarios are stored, so this limit bounds browser storage and page-open time. Each user frees space by deleting their own scenarios.
+- **Profile runs:** the newest 20 completed runs are kept. Failed or pending runs are kept so they can be retried, and the workspace lists the newest 10.
+- **Data Quality Portal:** stored sources may total at most 10 MB, measured as compact JSON, with a 5 MB per-file limit. Each dataset stores its source, validated records and export snapshot, so stored state is about three times the source size. Changes are no longer slow at this size. The budget now bounds the time to open the app, which reads everything stored (about 0.5–1 s at 30 MB), and the memory the browser holds.
+
+Civic Works caps requests (5,000), imports (100) and retained CSV exports (30). The Fleet Monitor caps history at 360 points per vehicle and 500 events. Geofences, inspection observations and their histories have no limit; they grow one user action at a time.
+
+These numbers describe single-tab browser work on synthetic data. Full-stack measurements are in the [root verification record](../VERIFICATION.md).
 
 ## Scope of the evidence
 

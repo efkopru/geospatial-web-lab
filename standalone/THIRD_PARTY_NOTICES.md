@@ -10,6 +10,7 @@ These copies form a notice collection for the five-app suite. The same collectio
 |---|---|---|---|
 | React | 19.3.0 | MIT | [React license](licenses/react-LICENSE.txt) |
 | React DOM | 19.3.0 | MIT | [React DOM license](licenses/react-dom-LICENSE.txt) |
+| Immer | 11.1.18 | MIT | [Immer license](licenses/immer-LICENSE.txt) |
 | ArcGIS Maps SDK for JavaScript, `@arcgis/core` | 5.1.26 | `SEE LICENSE IN LICENSE.md` | [Esri package license](licenses/arcgis-core-LICENSE.md), [package third-party notices](licenses/arcgis-core-third-party-notices.txt) |
 | CesiumJS, `cesium` | 1.145.0 | Apache-2.0 | [Cesium license and bundled notices](licenses/cesium-LICENSE.md) |
 | JSTS | 2.12.1 | `(EDL-1.0 OR EPL-1.0)` | [EDL 1.0](licenses/jsts-LICENSE_EDLv1.txt), [EPL 1.0](licenses/jsts-LICENSE_EPLv1.txt), [upstream license banner](licenses/jsts-license.txt) |
