@@ -125,7 +125,7 @@ These limits remain:
 
 Civic Works caps requests (5,000), imports (100) and retained CSV exports (30). The Fleet Monitor caps history at 360 points per vehicle and 500 events. Geofences, inspection observations and their histories have no limit; they grow one user action at a time.
 
-These numbers describe single-tab browser work on synthetic data. Full-stack measurements are in the [root verification record](../VERIFICATION.md).
+These numbers describe single-tab browser work on synthetic data. Full-stack measurements are in the [root verification record](../VERIFICATION.md#full-stack-performance-october-1-2026).
 
 ## Scope of the evidence
 

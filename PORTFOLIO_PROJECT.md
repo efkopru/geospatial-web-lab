@@ -1,6 +1,6 @@
 # Geospatial Web Lab: portfolio content and implementation brief
 
-Prepared September 29, 2026. This document covers **five applications with two editions each**: the original full-stack implementations and separate standalone browser implementations.
+Prepared September 29, 2026; facts and evidence refreshed October 1, 2026. This document covers **five applications with two editions each**: the original full-stack implementations and separate standalone browser implementations.
 
 Use sections 1 and 2 as public portfolio content. Sections 3 through 6 are implementation notes and evidence references for the portfolio maintainer. This is a content handoff; it does not change or publish the portfolio website.
 
@@ -129,18 +129,20 @@ Standalone records do not synchronize with the full-stack databases. Browser pro
 
 **Preserve the inputs behind an output.** Approved data exports, parcel calculations, and completed profiles retain the information needed to explain their results. The quality portal stores a SHA-256 digest alongside each approved snapshot, allowing the downloaded bytes to be checked against that digest.
 
+**Make the cost of a change follow the size of the change.** The standalone editions store each record as its own browser-database entry and save only what a change touched. A change that took about 2 seconds with 30 MB stored now takes a few milliseconds. In the full-stack editions, a benchmark found a dataset list loading megabytes of stored GeoJSON per row; it now reads only the columns it shows and serves about 20 times more requests per second.
+
 **Keep the original implementations available.** The standalone conversion added separate folders and its own dependencies. All 371 previously tracked files were unchanged at conversion, preserving the full-stack suite for comparison.
 
 ### Verification and outcome
 
-The September 29, 2026 verification records report:
+The verification records report:
 
 | Edition | Recorded checks |
 | --- | --- |
-| Full-stack | 109 Rails tests with 690 assertions; 44 frontend tests; 13 browser scenarios against real local APIs, databases, Redis, and workers; five frontend builds |
-| Standalone | 51 domain, storage, and packaging tests; seven interface tests; five static builds; browser checks of persistence, calculations, simulation, approvals, and downloads |
+| Full-stack | Rails, frontend and browser suites (109 Rails tests with 690 assertions, 44 frontend tests and 13 browser scenarios on September 29, run again in CI on every change). All five Docker stacks build and pass a container smoke test in CI. Benchmarks cover API latency, concurrent reads and background-job duration |
+| Standalone | 70 domain, storage and packaging tests; 10 interface tests; five static builds; a static-site check; browser checks of persistence, calculations, simulation, approvals, downloads, backup restore and storage migration |
 
-The standalone test and build pipeline also passed in a clean Ubuntu CI checkout. These checks establish specific implemented behaviors. They are not load tests, security certification, or evidence of operational adoption.
+Both editions' test and build pipelines run in clean Ubuntu CI checkouts. These checks establish specific implemented behaviors. The benchmarks are single-machine measurements on synthetic data. They are not capacity guarantees, security certification, or evidence of operational adoption.
 
 The resulting suite demonstrates full-stack GIS integration alongside a portable browser implementation of the same problem set. It provides concrete examples of spatial validation, asynchronous processing, interactive mapping, reproducible exports, and explicit architectural tradeoffs.
 
@@ -213,23 +215,25 @@ Keep map attribution visible. Identify the edition beside every image. Counts an
 | Documented spherical approximations | Exact parity with PostGIS ellipsoidal calculations |
 | Synthetic parcel capacity and elevation examples | Permitting advice, measured terrain, or engineering clearance analysis |
 | Local JSON backup export and same-app restore | Cloud synchronization, cross-device sync, or record merging |
-| Static builds verified | A published GitHub Pages site or fully offline app |
+| Static builds verified | A published GitHub Pages site or fully offline app (until a deployment is verified) |
+| Container builds and smoke tests in CI | A hosted or production deployment |
+| Recorded single-runner benchmarks | Proven capacity, uptime, or production scale |
 | Recorded tests and browser checks | Proven uptime, production scale, security certification, or business impact |
 
 The source repository was verified **private** while preparing this document. Keep repository and private CI links in maintainer notes until there is an intentional public source release. Do not publish local account credentials, machine paths, database backups, or runtime logs. A public case-study page does not require making the source repository public.
 
 ## 6. Maintainer evidence references
 
-Application source baseline: `4d231e37b75754b206398ffcee371c1479913b9e`. This Markdown preparation did not rerun the application suites; test counts above come from the dated verification records. Repository visibility and the successful standalone CI run were checked while preparing this document.
+Original application source baseline: `4d231e37b75754b206398ffcee371c1479913b9e`. The October 1 refresh covers the work merged afterwards: backup restore, storage limits, record-level standalone storage, container CI and benchmarks. Its standalone test counts were rerun locally; full-stack counts come from the dated records and CI. Repository visibility and the successful standalone CI run were checked while preparing this document.
 
 | Reference | What it supports |
 | --- | --- |
 | [Full-stack project summary](PROJECT_SUMMARY.md) | Purpose, architecture, implementation evidence, and AI-assisted framing |
-| [Full-stack verification](VERIFICATION.md) | Recorded backend, frontend, browser, build, and recovery checks |
+| [Full-stack verification](VERIFICATION.md) | Recorded backend, frontend, browser, build, recovery and container checks, and full-stack benchmarks |
 | [Illustrated feature report](FEATURE_REPORT.md) | Detailed full-stack features and screenshot provenance |
 | [Standalone setup](standalone/README.md) | Requirements, local use, storage behavior, builds, and preview commands |
 | [Edition comparison](standalone/COMPARISON.md) | Feature differences, local-processing limits, and spatial assumptions |
-| [Standalone verification](standalone/VERIFICATION.md) | 58 automated checks, browser acceptance evidence, and screenshot record |
+| [Standalone verification](standalone/VERIFICATION.md) | Automated checks, browser acceptance evidence, screenshot record and storage benchmarks |
 | [Third-party notices](standalone/THIRD_PARTY_NOTICES.md) | Preserved vendor notices and license provenance |
 | [Private source repository](https://github.com/efkopru/geospatial-web-lab) | Source access for authorized collaborators; not a public portfolio button |
 | [Successful standalone CI at the baseline commit](https://github.com/efkopru/geospatial-web-lab/actions/runs/36666878977) | Clean Ubuntu installation, tests, and all five static builds |
