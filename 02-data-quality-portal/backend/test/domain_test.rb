@@ -174,6 +174,31 @@ class DatasetApiTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
   end
 
+  test "listing and showing datasets do not load stored sources or exports" do
+    dataset, = Dataset.import!(user: @staff, name: "Large source", source_text: @source)
+    perform_enqueued_jobs { ValidateDatasetJob.perform_later(dataset.id) }
+    version = dataset.reload.approve!(approver: @staff)
+    login(@staff)
+    statements = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") { |*, payload| statements << payload[:sql] }
+    begin
+      get "/api/datasets"
+      assert_response :success
+      listed = response.parsed_body.fetch("datasets").find { |item| item["id"] == dataset.id }
+      assert_equal "approved", listed["status"]
+      assert_equal version.digest, listed.dig("version", "digest")
+      get "/api/datasets/#{dataset.id}"
+      assert_response :success
+      assert_equal 4, response.parsed_body["records"].size
+      assert_equal version.id, response.parsed_body.dig("version", "id")
+    ensure
+      ActiveSupport::Notifications.unsubscribe(subscriber)
+    end
+    reads = statements.grep(/\ASELECT/i).grep(/"datasets"|"dataset_versions"/)
+    assert reads.any?
+    assert reads.none? { |sql| sql.include?('"datasets".*') || sql.include?('"dataset_versions".*') }, reads.join("\n")
+  end
+
   test "reporters cannot read another reporters datasets or exports" do
     dataset, = Dataset.import!(user: @staff, name: "Private upload", source_text: @source)
     login(@reporter)
