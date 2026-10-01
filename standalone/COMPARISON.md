@@ -17,7 +17,7 @@ The full-stack edition demonstrates Rails APIs, server permissions, PostGIS, dur
 | Processing | Sidekiq workers with durable server state | JavaScript during actions; a coordinated browser timer for fleet replay |
 | Closing the browser | Server work can continue | Browser calculations and replay stop |
 | Shared access | Clients use the same authoritative server records | Browser profiles, origins and devices hold independent records |
-| Persistence controls | Database administration and backups | JSON backup export and app-specific reset; no backup restoration UI |
+| Persistence controls | Database administration and backups | JSON backup export, validated whole-app restore from those files, and app-specific reset |
 | Spatial engine | PostGIS geography/geometry operations | App-specific JavaScript formulas and JSTS topology validation |
 | Static hosting | Frontend can be static, but functional APIs require server hosting | Entire browser edition can be served as static files |
 | Learning evidence | Full-stack integration, job processing and server reliability | Browser state, interactive workflows and explicit local-storage limits |

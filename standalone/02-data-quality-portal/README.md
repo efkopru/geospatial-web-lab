@@ -12,7 +12,7 @@ Use the [standalone launcher instructions](../README.md) to install dependencies
 4. Switch to the staff demo role. Staff can view all local datasets; the reporter sees only datasets associated with its demo identity. These controls demonstrate the original workflow and are not authentication or a security boundary.
 5. For an upload containing rejected records, acknowledge their exclusion before selecting **Approve valid features**. A dataset with zero accepted records cannot be approved.
 6. Download the approved GeoJSON. It contains only accepted features in their original order. The displayed SHA-256 is calculated from the exact downloaded UTF-8 bytes.
-7. Reload the page to verify persistence. Use the shared local-data controls to export a backup or reset this app's synthetic data.
+7. Reload the page to verify persistence. Use the shared local-data controls to export or restore a backup, or reset this app's synthetic data.
 
 The sample files are also available in [public/samples](public/samples). Importing a sample as staff creates a staff-owned copy; importing the unchanged sample as reporter opens its existing seeded dataset.
 
@@ -43,7 +43,7 @@ The sample files are also available in [public/samples](public/samples). Importi
 | Ownership | Server-enforced signed-in users | Simulated roles inside a single browser data store |
 | Approval history | Database-backed version | Fixed snapshot maintained by this application's code |
 | Shared access | Other authenticated clients use server state | Other devices and browser profiles have independent state |
-| Recovery | Worker retry and database persistence | Shared browser backup/reset controls; interrupted uncommitted imports must be repeated |
+| Recovery | Worker retry and database persistence | Shared browser backup, restore and reset controls; interrupted uncommitted imports must be repeated |
 
 JSTS is a JavaScript port of the JTS topology suite. It applies planar OGC geometry validity rules, but this edition does **not** claim complete behavioral or numerical equivalence with the original PostGIS build. The regression tests cover the bundled examples, invalid coordinates, self-crossing polygons, holes outside shells, overlapping multipolygons, and degenerate lines. See the [JSTS project](https://github.com/bjornharrtell/jsts) for its algorithms, licenses, and precision caveats.
 
@@ -51,7 +51,7 @@ This edition rejects features containing more than **10,000 coordinate positions
 
 The application stores complete source records and review results locally. Browser storage capacity is finite; clearing site data removes them. Stored data can also be modified through browser tools. A fixed application snapshot and a matching digest demonstrate export reproducibility, not tamper resistance or a protected audit trail. Shared controls can reset seeded and imported data.
 
-The shared backup button exports an inspectable JSON archive of local state. Backup restoration/import is not implemented; the GeoJSON upload workflow imports datasets rather than restoring application backups.
+The shared backup button exports an inspectable JSON archive of local state, and **Restore local backup** replaces local state with such a file. The GeoJSON upload workflow imports datasets; it does not read application backups.
 
 After a static production build, the validation engine and app code are local assets. ArcGIS basemaps and external map resources still require internet access. The application does not promise a fully offline map.
 
