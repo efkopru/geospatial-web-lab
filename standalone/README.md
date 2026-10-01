@@ -44,7 +44,15 @@ Role checks demonstrate the original workflow: reporters have restricted request
 
 Each application uses a separate IndexedDB database. Changes persist across reloads on the same browser profile and origin. `localhost`, `127.0.0.1`, different ports and a hosted site are different origins, so they have separate data. An app running in development and the same app inside the built gallery can therefore show different local records. Data is not synchronized with the full-stack databases or other devices.
 
-**Export local backup** downloads the current app's stored state as JSON. **Restore local backup** reads such a file and, after confirmation, replaces only that app's local data with the backup's state. A restore accepts only a backup exported by the same app, with the current backup version and the expected top-level record structure (files up to 50 MB). Rejected files leave local data unchanged. A restore replaces the whole local dataset; it does not merge records. Other open tabs of the app receive the restored state. App-specific GeoJSON, JSON and CSV export buttons produce the workflow outputs described in each app's README.
+**Export local backup** downloads the current app's stored state as JSON. **Restore local backup** reads such a file and, after confirmation, replaces only that app's local data with the backup's state. A restore accepts only a backup that meets all of these conditions:
+
+- exported by the same app
+- uses the current backup version
+- has the expected top-level structure
+- each record of a seeded record type has the fields the app reads, with the expected value types
+- the file is at most 120 MB
+
+Rejected files leave local data unchanged. A restore replaces the whole local dataset; it does not merge records. Other open tabs of the app receive the restored state. A restored Fleet Monitor replay starts paused. The backup controls are disabled while a restore or reset is running. Backups are written as compact JSON. Indented backups from earlier exports can still be restored. App-specific GeoJSON, JSON and CSV export buttons produce the workflow outputs described in each app's README.
 
 **Reset demo data** asks for confirmation and then replaces only that standalone app's data with its initial synthetic dataset. It leaves the other standalone apps and the original full-stack databases unchanged. Browser site-data clearing, private browsing and storage eviction can also remove records.
 

@@ -45,6 +45,22 @@ describe('local backup restore', () => {
     expect(runtime.read()).toEqual({ count: 42, rows: [{ id: 1 }] });
   });
 
+  it('disables the backup and reset controls while a restore is in progress', async () => {
+    const id = 'restore-busy-' + crypto.randomUUID();
+    await open(id);
+    let finish;
+    vi.spyOn(runtime, 'restore').mockImplementation(() => new Promise((_resolve, reject) => { finish = reject; }));
+    chooseFile(JSON.stringify({ format: 'geospatial-web-lab-standalone-backup', version: 1, app: id, state: { count: 1, rows: [] } }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore backup' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reset demo data' })).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Restore local backup' })).toBeDisabled();
+    expect(screen.getByLabelText('Backup file')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    finish(new Error('Storage failed'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Storage failed');
+    expect(screen.getByRole('button', { name: 'Reset demo data' })).toBeEnabled();
+  });
+
   it('shows an error and keeps local data for invalid JSON or another app\'s backup', async () => {
     const id = 'restore-invalid-' + crypto.randomUUID();
     await open(id);

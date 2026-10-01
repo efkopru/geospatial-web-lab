@@ -48,7 +48,9 @@ for(const count of quick?[6,4500]:[6,1000,2500,4500]){
  const size=`${count} requests`;
  await measure('01 Civic Works','Create one request',size,runtime,run=>runtime.request('/api/issues',{method:'POST',body:{issue:{title:`Bench ${run}`,category:'roads',latitude:33.04,longitude:-96.99}}}));
  await measure('01 Civic Works','List with 1 km distance filter',size,runtime,()=>runtime.request('/api/issues?latitude=33.045&longitude=-96.995&radius_m=1000'));
- if(count+RUNS*501<=5000)await measure('01 Civic Works','Import 500 point features',size,runtime,run=>runtime.request('/api/import_runs',{method:'POST',body:{geojson:pointFeatures(500,run+count)}}));
+ // Inputs are built before timing so only the import itself is measured.
+ const imports=Array.from({length:RUNS},(_,run)=>pointFeatures(500,run+count));
+ if(count+RUNS*501<=5000)await measure('01 Civic Works','Import 500 point features',size,runtime,run=>runtime.request('/api/import_runs',{method:'POST',body:{geojson:imports[run]}}));
  await measure('01 Civic Works','Generate CSV export',size,runtime,()=>runtime.request('/api/export_runs',{method:'POST'}));
  runtime.dispose();
 }
@@ -62,13 +64,15 @@ for(const [count,vertices] of quick?[[2000,16]]:[[500,16],[2000,16],[2000,64]]){
  const sample=polygons(count,vertices,0);
  // Each run starts from the seeded datasets so the stored-upload budget does not interfere.
  const seeded=runtime.read();let stored;
- await measure('02 Data Quality','Validate upload',`${count} polygons x ${vertices} vertices (${Math.round(Buffer.byteLength(sample)/1024)} KB)`,runtime,run=>upload(runtime,polygons(count,vertices,run),`Bench ${run}`),{after:async()=>{stored=kb(runtime.read());await runtime.mutate(state=>{Object.assign(state,structuredClone(seeded));});},stateKb:()=>stored});
+ const sources=Array.from({length:RUNS},(_,run)=>polygons(count,vertices,run));
+ await measure('02 Data Quality','Validate upload',`${count} polygons x ${vertices} vertices (${Math.round(Buffer.byteLength(sample)/1024)} KB)`,runtime,run=>upload(runtime,sources[run],`Bench ${run}`),{after:async()=>{stored=kb(runtime.read());await runtime.mutate(state=>{Object.assign(state,structuredClone(seeded));});},stateKb:()=>stored});
  runtime.dispose();
 }
 {
  const runtime=await open('02-data-quality-portal',quality);
  for(let index=0;index<2;index++)await upload(runtime,polygons(2000,64,`fill-${index}`),`Fill ${index}`);
- await measure('02 Data Quality','Small upload at the stored-upload budget',`${runtime.read().datasets.length} datasets, 2 x 4.9 MB uploads`,runtime,run=>upload(runtime,polygons(1,8,`small-${run}`),`Small ${run}`));
+ const smalls=Array.from({length:RUNS},(_,run)=>polygons(1,8,`small-${run}`));
+ await measure('02 Data Quality','Small upload at the stored-upload budget',`${runtime.read().datasets.length} datasets, 2 x 4.9 MB uploads`,runtime,run=>upload(runtime,smalls[run],`Small ${run}`));
  runtime.dispose();
 }
 
@@ -82,11 +86,13 @@ for(const [count,vertices] of quick?[[2000,16]]:[[500,16],[2000,16],[2000,64]]){
  runtime.dispose();
 }
 
-// 04 Parcel Scenarios: growth up to the 500 saved-scenario cap.
-for(const count of quick?[0,parcels.MAX_SCENARIOS-RUNS-2]:[0,100,250,parcels.MAX_SCENARIOS-RUNS-2]){
+// 04 Parcel Scenarios: growth up to every demo user at the per-user cap (3 users).
+const SCENARIO_CAP=3*parcels.MAX_SCENARIOS_PER_USER;
+for(const count of quick?[0,SCENARIO_CAP-RUNS-2]:[0,100,300,SCENARIO_CAP-RUNS-2]){
  const state=parcels.seed();const ids=state.parcels.slice(0,6).map(parcel=>parcel.id);
  const runtime=await open('04-parcel-scenarios',parcels,state);
- if(count)await runtime.mutate((draft,ctx)=>{for(let index=0;index<count;index++)parcels.handle({path:'/api/scenarios',method:'POST',body:{scenario:{name:`Seeded ${index}`,floors:4,coverage:0.5,unit_area:850,parcel_ids:ids}}},ctx);});
+ // Fill Jordan's and Casey's quotas first, then Alex's, leaving Alex room for the timed saves.
+ if(count)await runtime.mutate((draft,ctx)=>{for(let index=0;index<count;index++){const user=ctx.users[[1,2,0][Math.min(2,Math.floor(index/parcels.MAX_SCENARIOS_PER_USER))]];parcels.handle({path:'/api/scenarios',method:'POST',body:{scenario:{name:`Seeded ${index}`,floors:4,coverage:0.5,unit_area:850,parcel_ids:ids}}},{...ctx,user});}});
  await measure('04 Parcel Scenarios','Save one scenario',`${count+2} saved scenarios`,runtime,run=>runtime.request('/api/scenarios',{method:'POST',body:{scenario:{name:`Bench ${run}`,floors:6,coverage:0.6,unit_area:900,parcel_ids:ids}}}));
  runtime.dispose();
 }

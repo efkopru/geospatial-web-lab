@@ -21,7 +21,7 @@ The sample files are also available in [public/samples](public/samples). Importi
 | Feature | Standalone behavior |
 |---|---|
 | Dataset library and summary cards | Counts, owner names, ready/approved status, and selection come from this app's IndexedDB state. |
-| File selection and drag/drop | Reads JSON locally, with a 5 MiB byte limit per file and a 10 MiB total for all stored uploads. Stored datasets cannot be deleted individually; export a backup and reset demo data to free the budget. Replacing a file with an invalid file clears the previous selection. |
+| File selection and drag/drop | Reads JSON locally, with a 5 MiB byte limit per file. Stored datasets may total 10 MiB of source GeoJSON, measured as compact JSON, so indentation does not count. Stored datasets cannot be deleted individually; export a backup and reset demo data to free the budget. Replacing a file with an invalid file clears the previous selection. |
 | Import policy | Requires a named GeoJSON FeatureCollection containing 1 to 2,000 features. Up to ten required attribute names can contain letters, digits, and underscores, starting with a letter or underscore. |
 | Required attributes | Each named property must exist directly on the feature's properties object and be nonblank. Zero and `false` count as supplied values. |
 | Geometry structure | Supports Point, MultiPoint, LineString, MultiLineString, Polygon, and MultiPolygon. Positions must contain exactly two finite numbers within WGS84 longitude/latitude ranges. Lines and polygon rings have minimum lengths; rings must close. |

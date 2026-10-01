@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seed, handle, calculateScenario, rectangleAreaM2, MAX_SCENARIOS } from '../04-parcel-scenarios/src/local-api.js';
+import { seed, handle, calculateScenario, rectangleAreaM2, MAX_SCENARIOS_PER_USER } from '../04-parcel-scenarios/src/local-api.js';
 
 const users = [{ id: 1, name: 'Alex Morgan', role: 'staff' }, { id: 2, name: 'Jordan Lee', role: 'reporter' }];
 function context(state = seed(), user = users[0]) {
@@ -72,11 +72,15 @@ test('read routes are side-effect free and spatial/district filters work', () =>
   assert.equal(JSON.stringify(ctx.state), before);
 });
 
-test('saved scenarios are capped so each browser save stays bounded, and deleting one frees space', () => {
+test('saved scenarios are capped per demo user, and only that user\'s deletions free their space', () => {
   const ctx = context();
-  for (let index = ctx.state.scenarios.length; index < MAX_SCENARIOS; index++) request(ctx, '/api/scenarios', 'POST', { scenario: { ...design, name: `Saved ${index}` } });
-  assert.throws(() => request(ctx, '/api/scenarios', 'POST', { scenario: design }), /holds 500 saved scenarios/);
-  assert.equal(ctx.state.scenarios.length, MAX_SCENARIOS);
+  const own = () => ctx.state.scenarios.filter(scenario => scenario.user_id === users[0].id).length;
+  while (own() < MAX_SCENARIOS_PER_USER) request(ctx, '/api/scenarios', 'POST', { scenario: { ...design, name: `Saved ${own()}` } });
+  assert.throws(() => request(ctx, '/api/scenarios', 'POST', { scenario: design }), /You have 200 saved scenarios/);
+  // Another demo user is unaffected by the first user's scenarios.
+  const reporter = context(ctx.state, users[1]);
+  assert.equal(request(reporter, '/api/scenarios', 'POST', { scenario: design }).user_id, users[1].id);
   request(ctx, `/api/scenarios/${ctx.state.scenarios[0].id}`, 'DELETE');
   assert.equal(request(ctx, '/api/scenarios', 'POST', { scenario: design }).name, 'Test courtyard');
+  assert.equal(own(), MAX_SCENARIOS_PER_USER);
 });

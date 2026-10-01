@@ -276,26 +276,117 @@ test('restore enforces a matching schema_version and recovers an incompatible sa
   } finally { runtime.dispose(); }
 });
 
-test('each standalone app restores its own backup and rejects a backup from another app', async () => {
-  const apps = ['01-service-requests', '02-data-quality-portal', '03-fleet-monitor', '04-parcel-scenarios', '05-infrastructure-inspections'];
-  const backups = new Map();
-  for (const app of apps) {
-    const { seed, handle } = await import(`../${app}/src/local-api.js`);
-    const runtime = createRuntime({ id: app, seed, handle, store: new LocalStore(app, { indexedDB: new IDBFactory(), locks: undefined }), environment: {} });
-    try {
-      await runtime.ready;
-      const backup = JSON.parse(JSON.stringify(await runtime.backup()));
-      await runtime.restore(backup);
-      assert.deepEqual(runtime.read(), backup.state, app);
-      backups.set(app, backup);
-    } finally { runtime.dispose(); }
+// Realistic activity per app, so restore validation is checked against records the handlers
+// create, not only against the seed it infers record shapes from.
+const square = [[-97.01, 33.0], [-97.0, 33.0], [-97.0, 33.01], [-97.01, 33.01], [-97.01, 33.0]];
+const ACTIVITY = {
+  '01-service-requests': async runtime => {
+    const { issue } = await runtime.request('/api/issues', { method: 'POST', body: { issue: { title: 'Benchmark pothole', category: 'roads', latitude: 33.04, longitude: -96.99 } } });
+    await runtime.request(`/api/issues/${issue.id}`, { method: 'PATCH', body: { issue: { status: 'assigned', assigned_to_id: 3, lock_version: 0 } } });
+    await runtime.request('/api/import_runs', { method: 'POST', body: { geojson: { type: 'FeatureCollection', features: [
+      { type: 'Feature', properties: { title: 'Imported light', category: 'lighting' }, geometry: { type: 'Point', coordinates: [-96.99, 33.05] } },
+      { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] } }] } } });
+    await runtime.request('/api/export_runs', { method: 'POST' });
+  },
+  '02-data-quality-portal': async runtime => {
+    const source = JSON.stringify({ type: 'FeatureCollection', features: [
+      { type: 'Feature', properties: { asset_id: 'A' }, geometry: { type: 'Point', coordinates: [-97, 33] } },
+      { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [-97, 33] } }] });
+    const { dataset } = await runtime.request('/api/datasets', { method: 'POST', body: { name: 'Mixed upload', source, required_attributes: ['asset_id'] } });
+    await runtime.request(`/api/datasets/${dataset.id}/approve`, { method: 'POST', body: { acknowledge_rejected: true } });
+  },
+  '03-fleet-monitor': async (runtime, fleet) => {
+    await runtime.request('/api/geofences', { method: 'POST', body: { geofence: { name: 'Restore zone', color: '#123abc', coordinates: square } } });
+    await runtime.mutate(state => { fleet.controlReplay(state, 'start'); for (let frame = 0; frame < 20; frame++) fleet.advance(state); });
+  },
+  '04-parcel-scenarios': async runtime => {
+    const scenario = await runtime.request('/api/scenarios', { method: 'POST', body: { scenario: { name: 'Restore test', floors: 5, coverage: 0.5, unit_area: 900, parcel_ids: [1, 2, 3] } } });
+    await runtime.request(`/api/scenarios/${scenario.id}/recalculate`, { method: 'POST' });
+  },
+  '05-infrastructure-inspections': async runtime => {
+    const { inspection } = await runtime.request('/api/assets/1/inspections', { method: 'POST', body: { inspection: { severity: 'low', notes: 'Synthetic restore check.', observed_at: '2026-09-30T11:00:00Z' } } });
+    await runtime.request(`/api/inspections/${inspection.id}`, { method: 'PATCH', body: { inspection: { status: 'resolved', resolution_notes: 'Resolved during the restore check.', lock_version: inspection.lock_version } } });
+    await runtime.request('/api/profile_runs', { method: 'POST', body: {} });
   }
-  const { seed, handle } = await import('../04-parcel-scenarios/src/local-api.js');
-  const parcels = createRuntime({ id: '04-parcel-scenarios', seed, handle, store: new LocalStore('parcels-cross', { indexedDB: new IDBFactory(), locks: undefined }), environment: {} });
+};
+const APPS = Object.keys(ACTIVITY);
+const openApp = async (app, adapter, indexedDB = new IDBFactory()) => {
+  const runtime = createRuntime({ id: app, ...adapter, start: undefined, store: new LocalStore(app, { indexedDB, locks: undefined }), environment: {} });
+  await runtime.ready;
+  return runtime;
+};
+
+test('each standalone app restores a backup of realistic activity and rejects a backup from another app', async () => {
+  const backups = new Map();
+  for (const app of APPS) {
+    const adapter = await import(`../${app}/src/local-api.js`);
+    const source = await openApp(app, adapter);
+    const target = await openApp(app, adapter);
+    try {
+      await ACTIVITY[app](source, adapter);
+      assert.equal(source.meta.error, '', app);
+      const backup = JSON.parse(JSON.stringify(await source.backup()));
+      await target.restore(backup);
+      const expected = structuredClone(backup.state);
+      adapter.prepareRestore?.(expected);
+      assert.deepEqual(target.read(), expected, app);
+      backups.set(app, backup);
+    } finally { source.dispose(); target.dispose(); }
+  }
+  const adapter = await import('../04-parcel-scenarios/src/local-api.js');
+  const parcels = await openApp('04-parcel-scenarios', adapter);
   try {
-    await parcels.ready;
     await assert.rejects(parcels.restore(backups.get('05-infrastructure-inspections')), /belongs to 05-infrastructure-inspections/);
     // Relabelling another app's file still fails the shape check against this app's seed.
     await assert.rejects(parcels.restore({ ...backups.get('05-infrastructure-inspections'), app: '04-parcel-scenarios' }), /"parcels" should be array, not missing/);
   } finally { parcels.dispose(); }
+});
+
+test('restore rejects records missing or mistyping the fields handlers read, without changing stored data', async () => {
+  for (const [app, key, broken, message] of [
+    ['04-parcel-scenarios', 'scenarios', { id: 1, user_id: 1 }, /Record 1 in "scenarios" has no "/],
+    ['02-data-quality-portal', 'datasets', { id: 3 }, /Record 1 in "datasets" has no "/],
+    ['01-service-requests', 'issues', null, /Record 1 in "issues" has an invalid \(string\) "latitude" field/]
+  ]) {
+    const adapter = await import(`../${app}/src/local-api.js`);
+    const runtime = await openApp(app, adapter);
+    try {
+      const backup = JSON.parse(JSON.stringify(await runtime.backup()));
+      if (broken) backup.state[key] = [broken];
+      else backup.state[key][0].latitude = '33.0';
+      const before = runtime.read();
+      await assert.rejects(runtime.restore(backup), message, app);
+      assert.deepEqual(runtime.read(), before, app);
+      assert.equal(runtime.revision, 0, app);
+    } finally { runtime.dispose(); }
+  }
+});
+
+test('a restored fleet replay is paused, so a tab already holding the replay lock does not resume it', async () => {
+  const fleet = await import('../03-fleet-monitor/src/local-api.js');
+  const source = await openApp('03-fleet-monitor', fleet);
+  const target = await openApp('03-fleet-monitor', fleet);
+  try {
+    await source.mutate(state => { fleet.controlReplay(state, 'start'); fleet.advance(state); });
+    const backup = JSON.parse(JSON.stringify(await source.backup()));
+    assert.equal(backup.state.replay.running, true);
+    await target.restore(backup);
+    assert.equal(target.read().replay.running, false);
+    assert.equal(target.read().replay.generation, backup.state.replay.generation + 1);
+    assert.deepEqual(target.read().points, backup.state.points);
+  } finally { source.dispose(); target.dispose(); }
+});
+
+test('a confirmed restore reuses the validation of the file the user chose', async () => {
+  let seeds = 0;
+  const runtime = createRuntime({ id: 'cached', seed: () => { seeds += 1; return { items: [], total: 0 }; }, handle: adapter, store: new LocalStore('cached', { indexedDB: new IDBFactory(), locks: undefined }), environment: {} });
+  try {
+    await runtime.ready;
+    const backup = { format: 'geospatial-web-lab-standalone-backup', app: 'cached', version: 1, state: { items: [{ owner: 1, value: 'kept' }], total: 1 } };
+    const initialSeeds = seeds;
+    await runtime.validateBackup(backup);
+    await runtime.restore(backup);
+    assert.equal(seeds - initialSeeds, 1);
+    assert.deepEqual(runtime.read(), backup.state);
+  } finally { runtime.dispose(); }
 });

@@ -9,7 +9,9 @@ keep="${2:-}"
 [[ "$project" =~ ^0([1-5])-[a-z0-9-]+$ && -f "$project/compose.yaml" ]] || { echo "Unknown project: $project" >&2; exit 2; }
 port=$((5170 + BASH_REMATCH[1]))
 base="http://127.0.0.1:$port"
-compose=(docker compose -f "$project/compose.yaml")
+# A separate Compose project keeps the smoke stack's containers and volumes apart from a
+# developer's own stack for the same app, which uses the compose file's fixed name.
+compose=(docker compose -p "geolab-smoke-${project}" -f "$project/compose.yaml")
 
 [[ -f "$project/.env" ]] || node scripts/configure-env.mjs >/dev/null
 
@@ -30,9 +32,20 @@ step() { echo "==> $project: $*"; }
 fail() { echo "FAIL $project: $*" >&2; exit 1; }
 wait_for() {
  local description="$1" seconds="$2"; shift 2
- for ((i = 0; i < seconds; i += 3)); do "$@" >/dev/null 2>&1 && return 0; sleep 3; done
- fail "timed out after ${seconds}s waiting for $description"
+ # Measure wall-clock time: a probe such as rails runner can take several seconds itself.
+ local deadline=$((SECONDS + seconds))
+ until "$@" >/dev/null 2>&1; do
+  ((SECONDS < deadline)) || fail "timed out after $((seconds + SECONDS - deadline))s waiting for $description"
+  sleep 3
+ done
 }
+
+# The smoke stack publishes the app's usual port, so another stack for the app must be stopped first.
+if curl -s -o /dev/null --max-time 2 "$base/"; then
+ trap - EXIT
+ echo "FAIL $project: $base is already in use. Stop the other stack for this app (docker compose down in $project) and retry." >&2
+ exit 1
+fi
 
 step "building images"
 "${compose[@]}" build --pull
