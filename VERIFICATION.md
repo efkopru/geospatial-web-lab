@@ -59,6 +59,44 @@ The [container workflow](.github/workflows/containers.yml) ran `scripts/containe
 
 This covers container build and startup on a CI runner. It does not cover a hosted deployment, TLS, or long-running operation.
 
+## Full-stack performance (October 1, 2026)
+
+The [benchmark workflow](.github/workflows/fullstack-benchmark.yml) starts each Compose stack with `scripts/container-smoke.sh` and runs `scripts/fullstack-benchmark.mjs`. The script signs in through nginx as a seeded staff user and measures:
+
+- API latency over sequential requests
+- read throughput with 10 concurrent clients
+- the time from the request that queues a Sidekiq job until polling shows it finished
+
+Runs used GitHub-hosted `ubuntu-24.04` runners, with every service of one app on a single runner. Data Quality results come from [run 36930398798](https://github.com/efkopru/geospatial-web-lab/actions/runs/36930398798), after the fix below. The other apps come from [run 36929216260](https://github.com/efkopru/geospatial-web-lab/actions/runs/36929216260).
+
+| App | Operation | Data size | Result |
+| --- | --- | --- | --- |
+| 01 Civic Works | Create one request | seeded data | median 10.8 ms, p95 112.3 ms (50 requests) |
+| 01 Civic Works | Import 500 point features (worker + PostGIS) | growing to ~4,000 requests | median 1.06 s, max 1.95 s (8 jobs) |
+| 01 Civic Works | List with 1 km distance filter | 4,056 requests | median 10.4 ms, p95 23.3 ms |
+| 01 Civic Works | Concurrent list with distance filter | 4,056 requests | 111.1 requests/s, p95 136.8 ms |
+| 01 Civic Works | Generate CSV export (worker) | 4,056 requests | median 0.23 s, max 0.41 s (5 jobs) |
+| 02 Data Quality | Upload and validate GeoJSON (worker + PostGIS) | 500 polygons x 16 vertices (329 KB) | median 1.86 s (3 jobs) |
+| 02 Data Quality | Upload and validate GeoJSON (worker + PostGIS) | 2,000 polygons x 16 vertices (1.3 MB) | median 7.17 s (3 jobs) |
+| 02 Data Quality | Upload and validate GeoJSON (worker + PostGIS) | 2,000 polygons x 64 vertices (4.9 MB) | median 9.92 s (3 jobs) |
+| 02 Data Quality | Dataset list | 11 datasets | median 4.6 ms, p95 9.3 ms |
+| 02 Data Quality | Dataset detail with records | 2,000 records | median 342.1 ms, p95 444.3 ms |
+| 02 Data Quality | Concurrent dataset list | 11 datasets | 183.8 requests/s, p95 71.0 ms |
+| 03 Fleet Monitor | Record manual telemetry (PostGIS geofence check) | 10 vehicles | median 13.4 ms, p95 29.2 ms (400 requests) |
+| 03 Fleet Monitor | Fleet snapshot | after telemetry | median 12.3 ms, p95 18.1 ms |
+| 03 Fleet Monitor | Vehicle history | up to 360 points | median 5.8 ms, p95 10.7 ms |
+| 03 Fleet Monitor | Concurrent fleet snapshot | 10 vehicles | 75.5 requests/s, p95 188.1 ms |
+| 04 Parcel Scenarios | Save and calculate a scenario (worker + PostGIS area) | 6 parcels | median 0.13 s, max 0.33 s (20 jobs) |
+| 04 Parcel Scenarios | Scenario list | 22 scenarios | median 3.8 ms, p95 8.4 ms |
+| 04 Parcel Scenarios | Concurrent parcel layer | 24 parcels | 334.2 requests/s, p95 46.8 ms |
+| 05 Inspections | Generate corridor profile (worker + PostGIS geography) | 8 assets, 71 samples | median 0.15 s, max 0.65 s (15 jobs) |
+| 05 Inspections | Asset register | 8 assets | median 4.4 ms, p95 9.5 ms |
+| 05 Inspections | Concurrent asset register | 8 assets | 194.7 requests/s, p95 75.5 ms |
+
+The first run found one defect. The Data Quality dataset list took 140.6 ms for 11 datasets and served only 8.5 requests/s with 10 concurrent clients (p95 1.4 s). It loaded every dataset's source JSONB and each approved version's stored content and export, which can be megabytes each. List and detail reads now select only summary columns, and a regression test checks the SQL they issue. In the second run the same list took 4.6 ms and served 183.8 requests/s.
+
+These are single-runner measurements on synthetic data, without a load balancer, TLS, or production tuning. They show where time goes and catch regressions. They are not capacity guarantees. Validating a large upload is the slowest workflow (about 10 s for 2,000 complex polygons); it runs in the background while the client polls. Action Cable fan-out under many subscribers was not measured.
+
 ## Boundaries
 
 Docker Desktop's engine failed to start in the original audit environment, so container image builds and runtime execution were **not verified** locally. They were later verified on GitHub Actions; see [Container verification](#container-verification-october-1-2026). The same applications were run and tested directly in WSL. At the time of this local audit, the workspace had not yet been published and remote CI had not run. Subsequent CI results are recorded in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions). No public application hosting was created.

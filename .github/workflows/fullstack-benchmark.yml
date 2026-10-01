@@ -1,0 +1,70 @@
+name: Benchmark full-stack applications
+
+# Measures API latency, concurrent reads and background-job duration through nginx for each
+# Compose stack. It runs on request and on pull requests that change the benchmark or backend
+# application code.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/fullstack-benchmark.mjs'
+      - 'scripts/container-smoke.sh'
+      - '.github/workflows/fullstack-benchmark.yml'
+      - '0[1-5]-*/backend/app/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fullstack-benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: Benchmark ${{ matrix.project }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - 01-service-requests
+          - 02-data-quality-portal
+          - 03-fleet-monitor
+          - 04-parcel-scenarios
+          - 05-infrastructure-inspections
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Build, start, seed and check the Compose stack
+        run: bash scripts/container-smoke.sh ${{ matrix.project }} --keep
+      - name: Record runner resources
+        run: |
+          {
+            echo "### Runner for ${{ matrix.project }}"
+            echo
+            echo "- CPU: $(nproc) x $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs)"
+            echo "- Memory: $(free -g | awk '/Mem:/ {print $2}') GB"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Benchmark through nginx
+        run: node scripts/fullstack-benchmark.mjs ${{ matrix.project }} | tee benchmark-${{ matrix.project }}.md
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-${{ matrix.project }}
+          path: benchmark-${{ matrix.project }}.md
+          if-no-files-found: ignore
+      - name: Show container logs after a failure
+        if: failure()
+        run: docker compose -p "geolab-smoke-${{ matrix.project }}" -f "${{ matrix.project }}/compose.yaml" logs --no-color --tail=200
+      - name: Remove the stack
+        if: always()
+        run: docker compose -p "geolab-smoke-${{ matrix.project }}" -f "${{ matrix.project }}/compose.yaml" down --volumes --remove-orphans
