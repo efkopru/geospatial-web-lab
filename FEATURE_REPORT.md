@@ -447,7 +447,7 @@ Additional recorded checks cover production eager loading and database queries, 
 
 Each Compose stack defines nginx, Rails, a separate worker, PostGIS, and Redis, with persistent volumes and ordered initialization. Environment configuration generates missing secrets while preserving existing values. Migrations run during startup, while demo seeding remains explicit. The application database role is separate from the PostgreSQL administrator and does not own the PostGIS extension.
 
-The Docker engine was unavailable during local verification. Container image builds and container runtime execution remain unverified even though configuration parsing passed. The applications were executed directly in WSL, and CI provides a separate working test environment. No public hosting has been created.
+The Docker engine was unavailable during local verification. Container image builds and container runtime execution remain unverified even though configuration parsing passed. The applications were executed directly in WSL, and CI provides a separate working test environment. The full-stack applications are not publicly hosted. Container builds were later verified in CI, and the standalone browser editions were published as a static demo; see [VERIFICATION.md](VERIFICATION.md) and [standalone/README.md](standalone/README.md#publishing-a-static-demo).
 
 External deployment still requires host and origin settings, HTTPS, secure cookies, trusted proxy configuration, replacement demo accounts, secret management, and operational verification. Dockerfiles and build success cannot establish uptime, capacity, or production readiness.
 
@@ -457,7 +457,7 @@ Describe the repository as an **AI-assisted learning and portfolio project using
 
 Screenshots document the running interface and the state visible at capture time. They complement source review and tests; they do not independently verify every backend branch. ArcGIS basemaps and SDK assets require network access, while full map and scene rendering requires suitable browser graphics support. The Cesium corridor's runtime assets are local and its elevations are synthetic.
 
-Reproduction commands are in [HOW_TO_USE.md](HOW_TO_USE.md); dated checks and corrections are in [VERIFICATION.md](VERIFICATION.md), [AUDIT.md](AUDIT.md), and [AUDIT_SECOND_PASS.md](AUDIT_SECOND_PASS.md). Exclude credentials, backups, and private runtime logs from releases. A private repository provides neither public application hosting nor a redistribution license.
+Reproduction commands are in [HOW_TO_USE.md](HOW_TO_USE.md); dated checks and corrections are in [VERIFICATION.md](VERIFICATION.md), [AUDIT.md](AUDIT.md), and [AUDIT_SECOND_PASS.md](AUDIT_SECOND_PASS.md). Exclude credentials, backups, and private runtime logs from releases. A public repository provides neither application hosting nor a redistribution license; this repository has no license file.
 
 ![Figure 21. Shared sign-in component, shown in Infrastructure inspections. Staff demo and Reporter demo select the seeded learning accounts. The displayed password is an intentional synthetic demo credential.](output/screenshots/feature-report/00-sign-in.jpg)
 

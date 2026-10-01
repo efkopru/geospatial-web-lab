@@ -127,6 +127,30 @@ Civic Works caps requests (5,000), imports (100) and retained CSV exports (30). 
 
 These numbers describe single-tab browser work on synthetic data. Full-stack measurements are in the [root verification record](../VERIFICATION.md#full-stack-performance-october-1-2026).
 
+## Public deployment (October 1, 2026)
+
+The standalone editions are published at [https://efkopru.github.io/geospatial-web-lab/](https://efkopru.github.io/geospatial-web-lab/) from `main` (commit `246bba4`). The [Publish standalone demo run](https://github.com/efkopru/geospatial-web-lab/actions/runs/36933360375) passed these steps:
+
+- the domain and interface tests and all five builds
+- a check of the built gallery through the local preview server
+- the GitHub Pages deployment
+- `verify-site.mjs` against the live URL: 29 URLs covering the gallery, all five apps, their bundled scripts, styles and icons, the Cesium assets, and the third-party notices and license copies
+
+Its first deployment attempt failed because Pages had not been enabled. Once the repository was public and Pages was enabled, a rerun deployed the site. Pages was set to "Deploy from a branch", though, so GitHub's own branch build replaced the demo a minute later with a Jekyll rendering of the repository. The first browser check caught this. After the source was changed to GitHub Actions, [run 36936442399](https://github.com/efkopru/geospatial-web-lab/actions/runs/36936442399) republished the demo. The publish workflow now stops unless the Pages source is GitHub Actions.
+
+The [browser check](https://github.com/efkopru/geospatial-web-lab/actions/runs/36936342531) then opened the live site in Chromium on a GitHub-hosted runner:
+
+| App | Workflow | Result |
+| --- | --- | --- |
+| Gallery | opened | hosted variant, no local full-stack links |
+| 01 Civic Works | saved, exported, restored, reloaded | changed request title kept and shown; revision 1 → 2 |
+| 02 Data Quality | saved, exported, restored, reloaded | changed dataset name kept and shown; revision 1 → 2 |
+| 03 Fleet Monitor | saved, exported, restored, reloaded | changed vehicle name kept and shown; revision 1 → 2 |
+| 04 Parcel Scenarios | saved, exported, restored, reloaded | changed parcel name kept and shown; revision 1 → 2 |
+| 05 Inspections | saved, exported, restored, reloaded | changed asset name kept and shown; revision 1 → 2; Cesium canvas present |
+
+No uncaught page errors were reported. The check does not wait for ArcGIS basemaps, and the four map apps had not drawn a map canvas by the time it finished, so live map rendering is not confirmed by this record.
+
 ## Scope of the evidence
 
 The browser checks used locally served production files with internet access for ArcGIS resources. They did not publish GitHub Pages or test a desktop installer, complete offline operation, every device/browser combination, or operational GIS datasets. Simulated roles are not authentication. The mathematical differences from PostGIS and local-storage limits are documented in [COMPARISON.md](COMPARISON.md).

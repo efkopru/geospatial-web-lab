@@ -2,7 +2,7 @@
 
 Five separate browser applications preserve the original interfaces and useful workflows while replacing Rails APIs, PostGIS databases, Redis, Sidekiq and Action Cable with local JavaScript and browser storage. The original full-stack projects remain in their existing repository folders and are unchanged by these additions.
 
-These editions use synthetic data. They are suitable for interactive demonstrations and learning. They are not deployed operational systems, authenticated multi-user applications or exact replacements for the original spatial engines. Read [COMPARISON.md](COMPARISON.md) for the feature and architecture differences.
+These editions use synthetic data. They are suitable for interactive demonstrations and learning. A public copy runs at [https://efkopru.github.io/geospatial-web-lab/](https://efkopru.github.io/geospatial-web-lab/). They are not operational systems, authenticated multi-user applications or exact replacements for the original spatial engines. Read [COMPARISON.md](COMPARISON.md) for the feature and architecture differences.
 
 ## Requirements
 
@@ -92,9 +92,19 @@ Open [the local gallery](http://127.0.0.1:5270/). Use either this gallery-only c
 
 ## Publishing a static demo
 
-The manual [Publish standalone demo](../.github/workflows/standalone-pages.yml) workflow tests and builds the suite, checks the built gallery through the local preview server, uploads `standalone/dist` to GitHub Pages and then checks the deployed URL. It runs only when started from the Actions tab, because publishing makes the browser editions public. Before the first run, set **Settings > Pages > Source** to **GitHub Actions**. Pages for a private repository requires a GitHub plan that supports it.
+The demo is published at [https://efkopru.github.io/geospatial-web-lab/](https://efkopru.github.io/geospatial-web-lab/). The manual [Publish standalone demo](../.github/workflows/standalone-pages.yml) workflow publishes it. It tests and builds the suite, checks the built gallery through the local preview server, uploads `standalone/dist` to GitHub Pages and checks the deployed URL. Then it runs the [browser check](../.github/workflows/standalone-browser-check.yml) against the live site. Start it from the Actions tab after standalone changes; it does not run on every push, because publishing replaces the public site. Before the first run, set **Settings > Pages > Build and deployment > Source** to **GitHub Actions**. Making a repository public does not turn Pages on, and "Deploy from a branch" must not be used: GitHub's branch build would replace the demo with a Jekyll rendering of the repository. The workflow stops with an error if the source is not GitHub Actions.
 
-`npm run verify:site -- <url>` checks any served copy of the build, local or hosted. It confirms that the gallery links all five apps and that each app's scripts, styles, icon and third-party notices are served with the expected content types. It also checks the Cesium assets for app 05 and the license copies at the gallery root. A host that answers missing files with its HTML page fails the check. The script does not open a browser, so IndexedDB persistence, WebGL rendering, ArcGIS basemaps and downloads still need a manual check on the deployed URL (see [VERIFICATION.md](VERIFICATION.md)). On a public host, the gallery and app shells hide the links to the local full-stack apps.
+`npm run verify:site -- <url>` checks any served copy of the build, local or hosted. It confirms that the gallery links all five apps and that each app's scripts, styles, icon and third-party notices are served with the expected content types. It also checks the Cesium assets for app 05 and the license copies at the gallery root. A host that answers missing files with its HTML page fails the check. The script does not open a browser. On a public host, the gallery and app shells hide the links to the local full-stack apps.
+
+`npm run verify:browser -- <url>` opens the served site in Chromium (run `npx playwright install chromium` once). On a public host it checks that the gallery and every app hide the local full-stack links. In each of the five apps it then:
+
+- waits for browser storage to load
+- downloads a backup and checks it belongs to that app
+- changes the first record's name or title in the backup and restores it through the UI
+- reloads the page and confirms that the change and a higher stored revision were kept
+- fails on any uncaught page error other than WebGL availability
+
+It also reports how many map or scene canvases each app drew. ArcGIS map rendering depends on network access to Esri services, so rendering is reported, not enforced. The browser check uses a fresh browser profile and never changes the published files.
 
 `node scripts/benchmark.mjs` measures the local adapters at their storage limits; the latest results are in [VERIFICATION.md](VERIFICATION.md#performance-baseline-october-1-2026).
 
@@ -106,7 +116,8 @@ Generated `dist`, dependency directories and local output are excluded by this s
 npm test
 npm run test:ui
 npm run build
-npm run verify:site -- http://127.0.0.1:5270/   # while node scripts/serve.mjs preview is running
+npm run verify:site -- http://127.0.0.1:5270/      # while node scripts/serve.mjs preview is running
+npm run verify:browser -- http://127.0.0.1:5270/   # same server; local hosts keep the full-stack links
 ```
 
 Domain and shared-runtime tests cover calculations, validation, simulated permissions, persistence behavior and replay coordination. Interface tests and production builds cover different concerns; none substitutes for browser inspection of WebGL rendering and actual workflows. If a restricted Windows shell prevents Node's test runner from spawning subprocesses, use `node --test --test-isolation=none tests/*.test.js` for the Node test suite.

@@ -213,7 +213,7 @@ docker compose exec db bash /docker-entrypoint-initdb.d/20-geolab.sh
 docker compose up --build -d
 ```
 
-The administrator initialization step grants the separate application role ownership of application tables while retaining administrator ownership of PostGIS. Do not delete the volume to upgrade it. Public hosting additionally requires HTTPS, real host/origin allowlists, secure cookies, consistent proxy/SSL configuration, and replacement of demo credentials. No public deployment is included.
+The administrator initialization step grants the separate application role ownership of application tables while retaining administrator ownership of PostGIS. Do not delete the volume to upgrade it. Public hosting additionally requires HTTPS, real host/origin allowlists, secure cookies, consistent proxy/SSL configuration, and replacement of demo credentials. The full-stack applications are not publicly hosted.
 
 ## 8. Preserve and recover data
 
