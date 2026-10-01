@@ -1,3 +1,4 @@
+import {createDraft,finishDraft,current,isDraft,freeze} from 'immer';
 import {LocalStore} from './storage.js';
 export const USERS=Object.freeze([
  {id:1,name:'Alex Morgan',role:'staff',email:'staff@example.test'},
@@ -7,6 +8,9 @@ export const USERS=Object.freeze([
 export function fail(message,status=422){const error=new Error(message);error.status=status;throw error;}
 const copy=value=>value===undefined?undefined:structuredClone(value);
 export const BACKUP_FORMAT='geospatial-web-lab-standalone-backup';
+const plain=value=>value!==null&&typeof value==='object'&&(Object.getPrototypeOf(value)===Object.prototype||Object.getPrototypeOf(value)===null);
+// Converts any draft inside a handler result into plain data before the draft is finished.
+const snapshot=value=>isDraft(value)?current(value):Array.isArray(value)?value.map(snapshot):plain(value)?Object.fromEntries(Object.entries(value).map(([key,item])=>[key,snapshot(item)])):value;
 const kind=value=>value===null?'null':Array.isArray(value)?'array':typeof value;
 // Required fields and value kinds for the records of each top-level array, inferred from the
 // seeded records. A field the seed only ever leaves null carries no type information.
@@ -59,7 +63,20 @@ export function createRuntime({id,seed,handle,start,prepareRestore,store=new Loc
  const context=(draft,actor=copy(user))=>({state:draft,user:copy(actor),users:copy(USERS),now:()=>new Date().toISOString(),fail,requireStaff(){if(actor?.role!=='staff')fail('This action requires the staff demonstration role.',403);}});
  const envelope=(draft,baseRevision)=>({version:1,app:id,state:draft,_revision:baseRevision+1,savedAt:new Date().toISOString()});
  const valid=value=>{if(value?.version!==1||value.app!==id||!value.state||typeof value.state!=='object')throw new Error('Saved data is incompatible. Export a backup, then reset this standalone dataset.');return value;};
- const apply=value=>{state=copy(value.state);dataRevision=value._revision||0;meta.savedAt=value.savedAt;meta.persistent=true;};
+ // The committed state is kept frozen in memory. Handlers work on a copy-on-write draft, so a
+ // change shares every untouched record with the committed state and only changed records are
+ // written to storage. Freezing makes any accidental mutation of committed data throw.
+ const apply=value=>{state=freeze(value.state,true);dataRevision=value._revision||0;meta.savedAt=value.savedAt;meta.persistent=true;};
+ // Reloads the committed state only when another tab has written since this tab last read it.
+ const sync=async()=>{
+  if(!store.revision){apply(valid(await store.get()));return;}
+  if(!state||await store.revision()!==dataRevision)apply(valid(await store.get()));
+ };
+ const runDraft=async fn=>{
+  const draft=createDraft(state);let result;
+  try{result=snapshot(await fn(draft));}catch(error){finishDraft(draft);throw error;}
+  return {next:finishDraft(draft),result};
+ };
  const broadcast=()=>{try{channel?.postMessage({type:'changed'});}catch{}notify('data');};
  // The seed shape is computed once; validated backups are remembered so a confirmed restore
  // does not clone and check the same file twice.
@@ -68,14 +85,20 @@ export function createRuntime({id,seed,handle,start,prepareRestore,store=new Loc
   if(!validated.has(value)){shape??=(async()=>{const reference=await seed();return {reference,shapes:recordShapes(reference)};})();const {reference,shapes}=await shape;const state=checkBackup(value,id,reference,shapes);prepareRestore?.(state);validated.set(value,state);}
   return validated.get(value);
  };
- const persist=async(draft,baseRevision=dataRevision)=>{const value=envelope(draft,baseRevision);try{await store.put(value,{expectedRevision:baseRevision});}catch(error){if(error.status===409)throw error;throw new Error(`Changes were not saved: ${error.message}. Export a backup or free browser storage.`);}apply(value);meta.error='';};
+ const persist=async(draft,baseRevision=dataRevision,base)=>{const value=envelope(draft,baseRevision);try{await store.put(value,{expectedRevision:baseRevision,base});}catch(error){if(error.status===409)throw error;throw new Error(`Changes were not saved: ${error.message}. Export a backup or free browser storage.`);}apply(value);meta.error='';};
  // Reset and restore publish a whole replacement state as one revision-checked write.
- const replaceState=next=>store.exclusive(async()=>{const previous=await store.get();await persist(next,previous?._revision||0);revision++;broadcast();notify('reset');});
+ const replaceState=next=>store.exclusive(async()=>{const previousRevision=store.revision?await store.revision():(await store.get())?._revision||0;await persist(next,previousRevision);revision++;broadcast();notify('reset');});
  const runtime={id,meta,users:USERS,
   get user(){return copy(user);},get revision(){return revision;},
   read:()=>copy(state),subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},reportError,
   async selectUser(id){await runtime.ready;user=USERS.find(x=>x.id===Number(id))||null;try{environment.sessionStorage?.setItem(roleKey,String(user?.id||0));}catch{}notify('session');return copy(user);},
-  async mutate(fn,actor=copy(user)){await runtime.ready;return store.exclusive(async()=>{apply(valid(await store.get()));const baseRevision=dataRevision;const draft=copy(state);const result=await fn(draft,context(draft,actor));if(disposed)return;await persist(draft,baseRevision);broadcast();return copy(result);}).catch(error=>{reportError(error);throw error;});},
+  async mutate(fn,actor=copy(user)){await runtime.ready;return store.exclusive(async()=>{
+   await sync();const base=state,baseRevision=dataRevision;
+   const {next,result}=await runDraft(draft=>fn(draft,context(draft,actor)));
+   if(disposed)return;
+   if(next!==base){await persist(next,baseRevision,base);broadcast();}
+   return copy(result);
+  }).catch(error=>{reportError(error);throw error;});},
   async request(input,options={}){
    const actor=copy(user);await runtime.ready;
    const url=new URL(input.startsWith('/api/')?input:'/api'+(input.startsWith('/')?'':'/')+input,'https://standalone.invalid');
@@ -89,8 +112,8 @@ export function createRuntime({id,seed,handle,start,prepareRestore,store=new Loc
    if(!actor)fail('Choose a demonstration role to continue.',401);
    const request={path:url.pathname,query:url.searchParams,method,body};
    if(method!=='GET')return runtime.mutate((draft,ctx)=>handle(request,ctx),actor);
-   // Read the last committed snapshot; handlers receive a disposable draft.
-   apply(valid(await store.get()));const draft=copy(state);return copy(await handle(request,context(draft,actor)));
+   // Read the last committed state; handlers receive a disposable draft.
+   await sync();const {result}=await runDraft(draft=>handle(request,context(draft,actor)));return copy(result);
   },
   async reset(){await runtime.ready;await replaceState(await seed());},
   async backup(){await runtime.ready;const saved=await store.get();return {format:BACKUP_FORMAT,exportedAt:new Date().toISOString(),...copy(saved)};},
@@ -112,7 +135,7 @@ export function createRuntime({id,seed,handle,start,prepareRestore,store=new Loc
  runtime.ready=(async()=>{
   await store.exclusive(async()=>{const previous=await store.get();if(previous)apply(valid(previous));else await persist(await seed());});
   if(disposed)return;
-  if(environment.BroadcastChannel){channel=new environment.BroadcastChannel(`geolab-standalone-${id}`);channel.onmessage=async()=>{try{apply(valid(await store.get()));notify('data');}catch(error){reportError(error);}};}
+  if(environment.BroadcastChannel){channel=new environment.BroadcastChannel(`geolab-standalone-${id}`);channel.onmessage=async()=>{try{await sync();notify('data');}catch(error){reportError(error);}};}
   meta.loading=false;notify('session');
  })().catch(error=>{meta.loading=false;reportError(error);notify('session');});
  runtime.ready.then(async()=>{if(start&&state&&!disposed)try{stop=await start(runtime);}catch(error){reportError(error);}});

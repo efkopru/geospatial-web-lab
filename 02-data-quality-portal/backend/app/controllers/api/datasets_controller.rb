@@ -6,12 +6,14 @@ module Api
     rescue_from ArgumentError, with: :render_bad_input
 
     def index
-      render json: { datasets: accessible.includes(:user, :dataset_version).order(created_at: :desc).limit(100).map(&:summary) }
+      datasets = accessible.select_summary.includes(:user).order(created_at: :desc).limit(100).to_a
+      versions = Dataset.version_summaries(datasets.map(&:id))
+      render json: { datasets: datasets.map { |dataset| dataset.summary(version: versions[dataset.id]) } }
     end
 
     def show
       records = @dataset.dataset_records.order(:ordinal)
-      render json: @dataset.summary.merge(
+      render json: @dataset.summary(version: Dataset.version_summaries([@dataset.id])[@dataset.id]).merge(
         "records" => records.map { |record| record.as_json(only: %i[id ordinal feature accepted validation_errors]) },
         "preview" => { "type" => "FeatureCollection", "features" => records.select(&:accepted).map { |record| record.feature.merge("id" => record.id) } }
       )
@@ -65,7 +67,9 @@ module Api
     end
 
     def load_dataset
-      @dataset = accessible.find(params[:id])
+      # Showing a dataset never needs its stored source; the other actions may.
+      scope = action_name == "show" ? accessible.select_summary : accessible
+      @dataset = scope.find(params[:id])
     end
 
     def render_bad_input(error)
