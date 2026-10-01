@@ -38,22 +38,41 @@ const storedText = (page, app) => page.evaluate(id => new Promise((resolve, reje
   };
 }), app);
 const saved = page => page.getByText('Saved in this browser (IndexedDB)').waitFor({ timeout: 90000 });
+// Records what a page actually showed, so a failure on a remote host can be diagnosed from the log.
+function watch(page) {
+  const notes = [];
+  page.on('console', message => { if (message.type() === 'error' && notes.length < 6) notes.push(`console: ${message.text().slice(0, 200)}`); });
+  page.on('requestfailed', request => { if (notes.length < 6) notes.push(`request failed: ${request.url().slice(0, 120)} (${request.failure()?.errorText})`); });
+  page.on('response', response => { if (response.status() >= 400 && notes.length < 6) notes.push(`HTTP ${response.status()}: ${response.url().slice(0, 120)}`); });
+  return async () => {
+    const title = await page.title().catch(() => '');
+    const text = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
+    return `at ${page.url()} title "${title}" text "${text}"${notes.length ? `; ${notes.join('; ')}` : ''}`;
+  };
+}
 
 try {
   {
     const page = await browser.newPage();
-    await page.goto(base.href);
-    const originals = await page.locator('[data-port]').count();
-    const hostedTip = await page.locator('[data-hosted]').count();
-    if (!local && (originals || !hostedTip)) fail('gallery', `public host shows ${originals} local full-stack links and ${hostedTip} hosted notes`);
-    rows.push(['gallery', 'opened', local ? 'local host variant' : `hosted variant (${originals} local links)`, '—']);
-    await page.close();
+    const describe = watch(page);
+    try {
+      const response = await page.goto(base.href);
+      const originals = await page.locator('[data-port]').count();
+      const hostedTip = await page.locator('[data-hosted]').count();
+      if (!local && (originals || !hostedTip)) fail('gallery', `public host shows ${originals} local full-stack links and ${hostedTip} hosted notes (HTTP ${response?.status()}) ${await describe()}`);
+      rows.push(['gallery', 'opened', local ? 'local host variant' : `hosted variant (${originals} local links)`, '—']);
+    } catch (error) {
+      fail('gallery', `${error.message.split('\n')[0]} ${await describe()}`);
+    } finally {
+      await page.close();
+    }
   }
   for (const app of APPS) {
     const context = await browser.newContext({ acceptDownloads: true });
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    const describe = watch(page);
     try {
       await page.goto(new URL(`${app}/`, base).href);
       await saved(page);
@@ -86,7 +105,7 @@ try {
       if (unexpected.length) fail(app, `uncaught page errors: ${unexpected.join(' | ').slice(0, 300)}`);
       rows.push([app, 'saved, exported, restored, reloaded', `${field} kept${shown ? ' and shown' : ''}; revision ${before} -> ${after.revision}`, `${canvases} canvas${canvases === 1 ? '' : 'es'}`]);
     } catch (error) {
-      fail(app, error.message.split('\n')[0]);
+      fail(app, `${error.message.split('\n')[0]} ${await describe()}${errors.length ? `; page errors: ${errors.join(' | ').slice(0, 300)}` : ''}`);
     } finally {
       await context.close();
     }
