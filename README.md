@@ -2,7 +2,7 @@
 
 Five full-stack learning applications, each with its own Rails backend, React frontend, PostgreSQL/PostGIS database, API, tests, and Docker Compose configuration. The root npm workspace shares map, chart, authentication, and layout components without sharing application data.
 
-This is an **AI-assisted learning and portfolio project using synthetic application data**. Local verification uses real APIs, databases, and workers. Container execution and public hosting remain unverified. Remote CI results are reported separately in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions).
+This is an **AI-assisted learning and portfolio project using synthetic application data**. Local verification uses real APIs, databases, and workers. Container builds and startup are verified in CI; public hosting remains unverified. Remote CI results are reported separately in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions).
 
 ## Documentation
 
@@ -123,6 +123,8 @@ Compose builds the selected frontend from the parent npm workspace. It runs ngin
 
 The backend image pins Ruby 3.4 on Debian trixie and explicitly installs the PostgreSQL 17 client to match the database service. CI also installs client 17; PostgreSQL's dump utility cannot read a server with a newer major version than the client.
 
+`scripts/container-smoke.sh <project>` builds one stack with generated secrets and starts it as a separate Compose project (`geolab-smoke-<project>`), so it never touches the containers or volumes of your own stack for that app. It uses the app's usual port, so stop your own stack for that app first; the script stops early if the port is busy. It then checks that migrations finished and the API is healthy. Through nginx, it requests the frontend bundle, `/up` and `/api/session`. It also runs `db:seed` in the API container, waits for a Sidekiq process to register in Redis, and confirms that the API, worker and web containers have not restarted. It removes the stack and its volumes afterwards unless `--keep` is passed. The [container workflow](.github/workflows/containers.yml) runs it for all five projects when backend, frontend or container files change.
+
 For a volume created by an older revision, first generate the new `APP_DATABASE_PASSWORD`, then run `docker compose up -d db` and `docker compose exec db bash /docker-entrypoint-initdb.d/20-geolab.sh` before starting the full stack. This idempotent administrator step grants the new application role ownership of existing application tables while leaving PostGIS extension objects with the administrator. Back up the database first; do not delete a volume to upgrade it.
 
 For an external deployment, provision HTTPS, set `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` to the real host, enable `SECURE_COOKIES`, configure trusted TLS termination and `FORCE_SSL` consistently, replace demo credentials, and keep secrets outside source control. The nginx configuration handles same-origin API requests and WebSocket upgrades. No public hosting has been created by this implementation.
@@ -146,7 +148,7 @@ Backend suites exercise PostGIS operations, validation, ownership and staff perm
 
 Tests explicitly migrate their test databases. Rails automatic test schema replacement is disabled because a restricted app role must not drop/recreate the administrator-owned PostGIS extension. `db/structure.sql` captures native spatial/generated columns and database constraints.
 
-Browser tests add synthetic records to development databases. Docker image builds and container runtime were not verified because the local engine could not start. The [GitHub workflow](.github/workflows/ci.yml) repeats validation on pushes and pull requests; its run status is separate from the dated local results above. No public deployment exists. Successful builds and Compose parsing do not establish deployment readiness.
+Browser tests add synthetic records to development databases. Docker image builds and container runtime could not be verified locally because the engine could not start. The [container workflow](.github/workflows/containers.yml) builds and smoke-tests each stack on GitHub Actions; all five passed on October 1, 2026 (see [VERIFICATION.md](VERIFICATION.md#container-verification-october-1-2026)). The [GitHub workflow](.github/workflows/ci.yml) repeats validation on pushes and pull requests; its run status is separate from the dated local results above. No public deployment exists. Successful builds and Compose parsing do not establish deployment readiness.
 
 ## Backup and restore
 

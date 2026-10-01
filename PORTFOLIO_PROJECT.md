@@ -146,7 +146,7 @@ The resulting suite demonstrates full-stack GIS integration alongside a portable
 
 ### Scope
 
-The project has no verified public application deployment. It uses synthetic data and makes no claim of municipal use, customer adoption, business savings, field-survey accuracy, or production scale. Container configuration was checked, but Docker image builds and runtime execution remain unverified. The standalone editions are browser applications, not desktop installers.
+The project has no verified public application deployment. It uses synthetic data and makes no claim of municipal use, customer adoption, business savings, field-survey accuracy, or production scale. Docker images for all five full-stack applications build and pass a container smoke test in CI; this is not a hosted deployment. The standalone editions are browser applications, not desktop installers.
 
 ---
 
@@ -160,7 +160,7 @@ These notes are for the person or agent updating the portfolio. Do not render th
 4. Copy the selected images using section 4. Rewrite relative Markdown image paths to the portfolio's actual asset URLs. Existing repository-relative paths work here but will not automatically work in a different repository.
 5. Make the first image the main visual. Present the five standalone screenshots as a gallery with edition labels and readable expanded views. Full-page screenshots need `height: auto` and a contain-style presentation; avoid cropping away attribution or important controls. Use descriptive alt text, intrinsic dimensions, and lazy loading for images below the main visual.
 6. Implement the architecture comparison as a semantic table or an accessible responsive equivalent. Present tests by edition. Do not add assertions, manual checks, screenshots, and automated tests into a single total.
-7. If a standalone demo is deployed later, publish the generated `standalone/dist` output to an appropriate static host and verify all five app paths, assets, browser storage, notices, and download controls. Preserve vendor attribution. Add its real public URL only after those checks. The original full-stack edition still requires backend services.
+7. If a standalone demo is deployed later, publish the generated `standalone/dist` output to an appropriate static host, for example with the manual `Publish standalone demo` workflow. Verify all five app paths, assets, and notices with `npm run verify:site -- <url>`, then check browser storage and download controls in a browser. Preserve vendor attribution. Add its real public URL only after those checks. The original full-stack edition still requires backend services.
 8. Run the destination portfolio's normal validation and inspect desktop and mobile rendering. Verify the resulting project route, image loading, captions, and link destinations. Website deployment remains a separate action from creating this Markdown document.
 
 ### Framework-neutral content model
@@ -212,7 +212,7 @@ Keep map attribution visible. Identify the edition beside every image. Counts an
 | Standalone role simulation | Authentication or protected multi-user access |
 | Documented spherical approximations | Exact parity with PostGIS ellipsoidal calculations |
 | Synthetic parcel capacity and elevation examples | Permitting advice, measured terrain, or engineering clearance analysis |
-| JSON backup export | Implemented backup restoration or cloud synchronization |
+| Local JSON backup export and same-app restore | Cloud synchronization, cross-device sync, or record merging |
 | Static builds verified | A published GitHub Pages site or fully offline app |
 | Recorded tests and browser checks | Proven uptime, production scale, security certification, or business impact |
 

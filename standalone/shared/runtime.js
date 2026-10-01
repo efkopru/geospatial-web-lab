@@ -6,11 +6,49 @@ export const USERS=Object.freeze([
 ]);
 export function fail(message,status=422){const error=new Error(message);error.status=status;throw error;}
 const copy=value=>value===undefined?undefined:structuredClone(value);
+export const BACKUP_FORMAT='geospatial-web-lab-standalone-backup';
+const kind=value=>value===null?'null':Array.isArray(value)?'array':typeof value;
+// Required fields and value kinds for the records of each top-level array, inferred from the
+// seeded records. A field the seed only ever leaves null carries no type information.
+function recordShapes(reference){
+ const shapes={};
+ for(const [key,items] of Object.entries(reference)){
+  if(kind(items)!=='array'||!items.length||items.some(item=>kind(item)!=='object'))continue;
+  const fields=new Map();
+  for(const field of Object.keys(items[0]))if(items.every(item=>Object.hasOwn(item,field)))fields.set(field,new Set(items.map(item=>kind(item[field]))));
+  for(const [field,kinds] of fields)if(kinds.size===1&&kinds.has('null'))fields.delete(field);
+  shapes[key]=fields;
+ }
+ return shapes;
+}
+// A backup must come from this app, use the current envelope version and match the shape of a
+// freshly seeded state (top-level fields and the fields of seeded record types), so a restore
+// cannot load another app's records or records the handlers cannot read.
+export function checkBackup(value,id,reference,shapes=recordShapes(reference)){
+ if(kind(value)!=='object'||value.format!==BACKUP_FORMAT)fail('This file is not a standalone backup. Choose a file saved with Export local backup.');
+ if(value.app!==id)fail(`This backup belongs to ${typeof value.app==='string'?value.app:'another app'}, not ${id}.`);
+ if(value.version!==1)fail(`Backup version ${value.version} is not supported by this edition.`);
+ const state=value.state;if(kind(state)!=='object')fail('The backup has no stored state.');
+ for(const [key,expected] of Object.entries(reference)){
+  const actual=kind(state[key]);
+  if(actual!==kind(expected))fail(`The backup field "${key}" should be ${kind(expected)}, not ${actual==='undefined'?'missing':actual}.`);
+  if(actual==='array'&&state[key].some(item=>kind(item)!=='object'))fail(`The backup field "${key}" contains invalid records.`);
+  if(actual==='number'&&!Number.isFinite(state[key]))fail(`The backup field "${key}" is not a finite number.`);
+ }
+ if('schema_version' in reference&&state.schema_version!==reference.schema_version)fail(`Backup schema ${state.schema_version} does not match this edition's schema ${reference.schema_version}.`);
+ for(const [key,fields] of Object.entries(shapes))state[key].forEach((record,index)=>{
+  for(const [field,kinds] of fields){
+   const actual=kind(record[field]);
+   if(!kinds.has(actual))fail(`Record ${index+1} in "${key}" has ${actual==='undefined'?'no':`an invalid (${actual})`} "${field}" field.`);
+  }
+ });
+ return copy(state);
+}
 let active;
 export function getRuntime(){if(!active)throw new Error('Standalone application was not initialized.');return active;}
 export function configureStandalone(options){active?.dispose();active=createRuntime(options);return active;}
 
-export function createRuntime({id,seed,handle,start,store=new LocalStore(id),environment=globalThis}){
+export function createRuntime({id,seed,handle,start,prepareRestore,store=new LocalStore(id),environment=globalThis}){
  let state,user=USERS[0],revision=0,dataRevision=0,disposed=false,stop,channel;
  const listeners=new Set();
  const meta={loading:true,error:'',persistent:false,savedAt:null,coordinated:!!environment.navigator?.locks};
@@ -23,7 +61,16 @@ export function createRuntime({id,seed,handle,start,store=new LocalStore(id),env
  const valid=value=>{if(value?.version!==1||value.app!==id||!value.state||typeof value.state!=='object')throw new Error('Saved data is incompatible. Export a backup, then reset this standalone dataset.');return value;};
  const apply=value=>{state=copy(value.state);dataRevision=value._revision||0;meta.savedAt=value.savedAt;meta.persistent=true;};
  const broadcast=()=>{try{channel?.postMessage({type:'changed'});}catch{}notify('data');};
+ // The seed shape is computed once; validated backups are remembered so a confirmed restore
+ // does not clone and check the same file twice.
+ let shape;const validated=new WeakMap();
+ const backupState=async value=>{
+  if(!validated.has(value)){shape??=(async()=>{const reference=await seed();return {reference,shapes:recordShapes(reference)};})();const {reference,shapes}=await shape;const state=checkBackup(value,id,reference,shapes);prepareRestore?.(state);validated.set(value,state);}
+  return validated.get(value);
+ };
  const persist=async(draft,baseRevision=dataRevision)=>{const value=envelope(draft,baseRevision);try{await store.put(value,{expectedRevision:baseRevision});}catch(error){if(error.status===409)throw error;throw new Error(`Changes were not saved: ${error.message}. Export a backup or free browser storage.`);}apply(value);meta.error='';};
+ // Reset and restore publish a whole replacement state as one revision-checked write.
+ const replaceState=next=>store.exclusive(async()=>{const previous=await store.get();await persist(next,previous?._revision||0);revision++;broadcast();notify('reset');});
  const runtime={id,meta,users:USERS,
   get user(){return copy(user);},get revision(){return revision;},
   read:()=>copy(state),subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);},reportError,
@@ -45,9 +92,12 @@ export function createRuntime({id,seed,handle,start,store=new LocalStore(id),env
    // Read the last committed snapshot; handlers receive a disposable draft.
    apply(valid(await store.get()));const draft=copy(state);return copy(await handle(request,context(draft,actor)));
   },
-  async reset(){await runtime.ready;await store.exclusive(async()=>{const previous=await store.get();await persist(await seed(),previous?._revision||0);revision++;broadcast();notify('reset');});},
-  async backup(){await runtime.ready;const saved=await store.get();return {format:'geospatial-web-lab-standalone-backup',exportedAt:new Date().toISOString(),...copy(saved)};},
-  dispose(){disposed=true;stop?.();channel?.close();store.close();listeners.clear();environment.removeEventListener?.('pagehide',unload);environment.removeEventListener?.('pageshow',restore);environment.document?.removeEventListener('click',downloadClick);}
+  async reset(){await runtime.ready;await replaceState(await seed());},
+  async backup(){await runtime.ready;const saved=await store.get();return {format:BACKUP_FORMAT,exportedAt:new Date().toISOString(),...copy(saved)};},
+  // Checks a backup without changing stored data; restore then replaces the whole state with it.
+  async validateBackup(value){await backupState(value);},
+  async restore(value){await runtime.ready;await replaceState(await backupState(value));},
+  dispose(){disposed=true;stop?.();channel?.close();store.close();listeners.clear();environment.removeEventListener?.('pagehide',unload);environment.removeEventListener?.('pageshow',reloadFromCache);environment.document?.removeEventListener('click',downloadClick);}
  };
  const downloadClick=async event=>{
   if(event.defaultPrevented||event.button!==0)return;const anchor=event.target.closest?.('a[href]');if(!anchor)return;
@@ -55,10 +105,10 @@ export function createRuntime({id,seed,handle,start,store=new LocalStore(id),env
   event.preventDefault();try{const value=await runtime.request(href);if(!value?.download)throw new Error('This download is unavailable.');download(value.download);}catch(error){reportError(error);}
  };
  const unload=()=>{stop?.();channel?.close();};
- const restore=event=>{if(event.persisted)environment.location?.reload();};
+ const reloadFromCache=event=>{if(event.persisted)environment.location?.reload();};
  environment.document?.addEventListener('click',downloadClick);
  environment.addEventListener?.('pagehide',unload);
- environment.addEventListener?.('pageshow',restore);
+ environment.addEventListener?.('pageshow',reloadFromCache);
  runtime.ready=(async()=>{
   await store.exclusive(async()=>{const previous=await store.get();if(previous)apply(valid(previous));else await persist(await seed());});
   if(disposed)return;
