@@ -1,7 +1,8 @@
 name: Benchmark full-stack applications
 
 # Measures API latency, concurrent reads and background-job duration through nginx for each
-# Compose stack. It runs on request and when the benchmark itself changes, not on every push.
+# Compose stack. It runs on request and on pull requests that change the benchmark or backend
+# application code.
 on:
   workflow_dispatch:
   pull_request:
@@ -9,6 +10,7 @@ on:
       - 'scripts/fullstack-benchmark.mjs'
       - 'scripts/container-smoke.sh'
       - '.github/workflows/fullstack-benchmark.yml'
+      - '0[1-5]-*/backend/app/**'
 
 permissions:
   contents: read

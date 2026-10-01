@@ -52,10 +52,23 @@ class Dataset < ApplicationRecord
     end
   end
 
-  def summary
+  # Columns a summary needs. The source GeoJSON and a version's stored export can each be
+  # megabytes, so listing and detail reads load only these.
+  SUMMARY_COLUMNS = %i[id user_id name status total_count processed_count valid_count invalid_count required_attributes failure_message created_at updated_at].freeze
+  VERSION_SUMMARY_COLUMNS = %i[id dataset_id digest feature_count created_at].freeze
+
+  def self.select_summary
+    select(*SUMMARY_COLUMNS.map { |column| arel_table[column] })
+  end
+
+  def self.version_summaries(ids)
+    DatasetVersion.where(dataset_id: ids).select(*VERSION_SUMMARY_COLUMNS).index_by(&:dataset_id)
+  end
+
+  def summary(version: dataset_version)
     as_json(only: %i[id name status total_count processed_count valid_count invalid_count required_attributes failure_message created_at updated_at]).merge(
       "owner" => user.name,
-      "version" => dataset_version&.as_json(only: %i[id digest feature_count created_at])
+      "version" => version&.as_json(only: %i[id digest feature_count created_at])
     )
   end
 
