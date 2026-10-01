@@ -1,5 +1,7 @@
 const RADIUS_M = 6371008.8;
 const INITIAL_TIME = '2026-09-29T15:00:00.000Z';
+// The workspace lists the newest 10 runs; older completed runs are pruned so each save stays small.
+export const PROFILE_RUN_LIMIT = 20;
 const PROFILE_SOURCE = 'Synthetic base elevations; linear elevation interpolation along spherical great-circle segments (mean radius 6371008.8 m); not a DEM or PostGIS ellipsoidal calculation';
 const round = (value, places = 2) => Number(value.toFixed(places));
 const rad = (value) => value * Math.PI / 180;
@@ -134,6 +136,7 @@ export function handle({ path, method = 'GET', body = {} }, context) {
     const result = buildProfile(assets), timestamp = now();
     const run = { id: state.nextProfileId++, user_id: user.id, status: 'completed', generation: 1, created_at: timestamp, completed_at: timestamp, error_message: null, asset_snapshot: assets, ...result };
     state.profileRuns.push(run);
+    state.profileRuns = state.profileRuns.slice(-PROFILE_RUN_LIMIT);
     return { profile_run: profilePayload(run) };
   }
   match = path.match(/^\/api\/profile_runs\/(\d+)(?:\/(download|retry))?$/);

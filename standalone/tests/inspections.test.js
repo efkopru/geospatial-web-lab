@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seed, handle, buildProfile, greatCircleDistance, interpolateGreatCircle } from '../05-infrastructure-inspections/src/local-api.js';
+import { seed, handle, buildProfile, greatCircleDistance, interpolateGreatCircle, PROFILE_RUN_LIMIT } from '../05-infrastructure-inspections/src/local-api.js';
 
 const users = [{ id: 1, name: 'Alex Morgan', role: 'staff' }, { id: 2, name: 'Jordan Lee', role: 'reporter' }, { id: 3, name: 'Casey Rivera', role: 'staff' }];
 function context(state = seed(), user = users[0]) {
@@ -88,4 +88,13 @@ test('GET routes never mutate persisted state', () => {
   const before = JSON.stringify(ctx.state);
   for (const path of ['/api/assets', '/api/assets/3', '/api/profile_runs', '/api/profile_runs/1', '/api/profile_runs/1/download']) request(ctx, path);
   assert.equal(JSON.stringify(ctx.state), before);
+});
+
+test('only the newest completed profile runs are retained, which covers every run the workspace lists', () => {
+  const ctx = context();
+  const ids = Array.from({ length: PROFILE_RUN_LIMIT + 5 }, () => request(ctx, '/api/profile_runs', 'POST').profile_run.id);
+  assert.deepEqual(ctx.state.profileRuns.map(run => run.id), ids.slice(-PROFILE_RUN_LIMIT));
+  assert.deepEqual(request(ctx, '/api/profile_runs').profile_runs.map(run => run.id), ids.slice(-10).reverse());
+  assert.throws(() => request(ctx, `/api/profile_runs/${ids[0]}`), error => error.status === 404);
+  assert.equal(request(ctx, `/api/profile_runs/${ids.at(-1)}`).samples.length, 71);
 });

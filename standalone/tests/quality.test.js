@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { seed, handle, canonical, validateFeature } from '../02-data-quality-portal/src/local-api.js';
+import { seed, handle, canonical, validateFeature, MAX_STORED_SOURCE_BYTES } from '../02-data-quality-portal/src/local-api.js';
 
 const users = [{ id: 1, role: 'staff', name: 'Alex Morgan' }, { id: 2, role: 'reporter', name: 'Jordan Lee' }, { id: 3, role: 'staff', name: 'Casey Rivera' }];
 function context(state, userId = 1) {
@@ -111,4 +111,17 @@ test('canonical serialization retains prototype-like source property names as da
   assert.equal(JSON.stringify(result), '{"__proto__":{"asset_id":"value"},"a":2,"z":1}');
   const inherited = Object.create({ asset_id: 'inherited' });
   assert.match(validateFeature(point(inherited), ['asset_id']).join(), /missing or blank/);
+});
+
+test('total stored upload size is capped while duplicate uploads still resolve to the existing dataset', async () => {
+  const state = seed();
+  // About 4.5 MB per upload: the 5 MB file limit still applies, and the total budget stops the third.
+  const large = tag => Array.from({ length: 1900 }, (_, index) => point({ asset_id: `${tag}-${index}`, note: 'x'.repeat(2300) }));
+  for (const tag of ['a', 'b']) await upload(state, large(tag), { name: `Large ${tag}` });
+  const stored = state.datasets.reduce((total, item) => total + (item.source_bytes ?? 0), 0);
+  assert.ok(stored < MAX_STORED_SOURCE_BYTES && stored > 8 * 1024 * 1024);
+  await assert.rejects(upload(state, large('c'), { name: 'Large c' }), /of the 10 MB local upload budget/);
+  assert.equal(state.datasets.length, 4);
+  assert.equal((await upload(state, large('a'), { name: 'Large a again' })).duplicate, true);
+  assert.equal((await upload(state, [point({ asset_id: 'small' })], { name: 'Small' })).duplicate, false);
 });

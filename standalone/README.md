@@ -88,6 +88,8 @@ The manual [Publish standalone demo](../.github/workflows/standalone-pages.yml) 
 
 `npm run verify:site -- <url>` checks any served copy of the build, local or hosted. It confirms that the gallery links all five apps and that each app's scripts, styles, icon and third-party notices are served with the expected content types. It also checks the Cesium assets for app 05 and the license copies at the gallery root. A host that answers missing files with its HTML page fails the check. The script does not open a browser, so IndexedDB persistence, WebGL rendering, ArcGIS basemaps and downloads still need a manual check on the deployed URL (see [VERIFICATION.md](VERIFICATION.md)). On a public host, the gallery and app shells hide the links to the local full-stack apps.
 
+`node scripts/benchmark.mjs` measures the local adapters at their storage limits; the latest results are in [VERIFICATION.md](VERIFICATION.md#performance-baseline-october-1-2026).
+
 Generated `dist`, dependency directories and local output are excluded by this suite's `.gitignore`. Commit source and lockfiles; rebuild static files when preparing a deployment. [Third-party notices](THIRD_PARTY_NOTICES.md) and license copies are included with the app builds and assembled gallery.
 
 ## Verification commands
