@@ -2,6 +2,8 @@ const EARTH_RADIUS_M = 6371008.8;
 const SQFT_PER_M2 = 10.76391041671;
 const AREA_METHOD = 'Spherical geographic rectangle area; mean Earth radius 6371008.8 m. This browser edition does not use PostGIS ellipsoidal area.';
 const INITIAL_TIME = '2026-09-29T15:00:00.000Z';
+// Every save rewrites the whole browser dataset; this keeps saves well under a second.
+export const MAX_SCENARIOS = 500;
 const round = (value, places = 2) => Number(value.toFixed(places));
 const radians = (degrees) => degrees * Math.PI / 180;
 
@@ -72,6 +74,7 @@ export function handle({ path, method = 'GET', body = {}, query = new URLSearchP
   if (path === '/api/scenarios' && method === 'GET') return state.scenarios.filter((scenario) => scenario.user_id === user.id).sort((a, b) => b.id - a.id);
   if (path === '/api/scenarios' && method === 'POST') {
     const attributes = validateScenario(body.scenario, state, fail);
+    if (state.scenarios.length >= MAX_SCENARIOS) fail(`This standalone dataset holds ${MAX_SCENARIOS} saved scenarios. Delete scenarios you no longer need, then save again.`);
     const timestamp = now();
     const scenario = { ...attributes, id: state.nextScenarioId++, user_id: user.id, status: 'complete', revision: 1, created_at: timestamp, updated_at: timestamp, error_message: null };
     scenario.results = calculateScenario(scenario, state.parcels);

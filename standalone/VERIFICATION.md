@@ -57,6 +57,58 @@ These captures show synthetic acceptance-test data saved in the local gallery's 
 
 ![Standalone Cesium asset and calculated elevation profile](screenshots/05-infrastructure-inspections.jpg)
 
+## Performance baseline (October 1, 2026)
+
+`node scripts/benchmark.mjs` runs the real app adapters through the shared runtime: state clone, handler, envelope and IndexedDB write. It uses fake-indexeddb in Node and reports the median of five runs. It was run on Linux with Node.js 22 on a cloud Intel Xeon 2.8 GHz container. Absolute times differ between machines and browsers. The useful result is how cost grows with stored data. Every change rewrites the app's whole stored state, so a save gets slower as that state grows, while the domain logic itself stays fast. For example, JSTS validation of 2,000 polygons with 64 vertices each takes about 1 s by itself.
+
+| App | Operation | Data size | Stored state after the runs | Median |
+| --- | --- | --- | ---: | ---: |
+| 01 Civic Works | Create one request | 6 requests | 4 KB | 0.8 ms |
+| 01 Civic Works | List with 1 km distance filter | 6 requests | 4 KB | 0.6 ms |
+| 01 Civic Works | Import 500 point features | 6 requests | 745 KB | 46.2 ms |
+| 01 Civic Works | Generate CSV export | 6 requests | 1,975 KB | 92.1 ms |
+| 01 Civic Works | Create one request | 1000 requests | 371 KB | 33.1 ms |
+| 01 Civic Works | List with 1 km distance filter | 1000 requests | 371 KB | 12.6 ms |
+| 01 Civic Works | Import 500 point features | 1000 requests | 1,119 KB | 63.7 ms |
+| 01 Civic Works | Generate CSV export | 1000 requests | 2,885 KB | 135.1 ms |
+| 01 Civic Works | Create one request | 2500 requests | 929 KB | 66.3 ms |
+| 01 Civic Works | List with 1 km distance filter | 2500 requests | 929 KB | 36.0 ms |
+| 01 Civic Works | Generate CSV export | 2500 requests | 2,211 KB | 84.8 ms |
+| 01 Civic Works | Create one request | 4500 requests | 1,672 KB | 122.3 ms |
+| 01 Civic Works | List with 1 km distance filter | 4500 requests | 1,672 KB | 58.7 ms |
+| 01 Civic Works | Generate CSV export | 4500 requests | 3,987 KB | 164.6 ms |
+| 02 Data Quality | Validate upload | 500 polygons x 16 vertices (327 KB) | 1,037 KB | 86.8 ms |
+| 02 Data Quality | Validate upload | 2000 polygons x 16 vertices (1311 KB) | 4,127 KB | 298.6 ms |
+| 02 Data Quality | Validate upload | 2000 polygons x 64 vertices (4974 KB) | 15,114 KB | 756.0 ms |
+| 02 Data Quality | Small upload at the stored-upload budget | 4 datasets, 2 x 4.9 MB uploads | 30,286 KB | 4033.4 ms |
+| 03 Fleet Monitor | Replay tick (10 vehicles) | empty history | 27 KB | 5.1 ms |
+| 03 Fleet Monitor | Replay tick (10 vehicles) | history at 360 points per vehicle | 549 KB | 49.7 ms |
+| 04 Parcel Scenarios | Save one scenario | 2 saved scenarios | 17 KB | 3.3 ms |
+| 04 Parcel Scenarios | Save one scenario | 102 saved scenarios | 192 KB | 47.8 ms |
+| 04 Parcel Scenarios | Save one scenario | 252 saved scenarios | 454 KB | 123.5 ms |
+| 04 Parcel Scenarios | Save one scenario | 495 saved scenarios | 879 KB | 266.3 ms |
+| 05 Inspections | Generate 71-sample profile | 0 stored profile runs | 47 KB | 2.7 ms |
+| 05 Inspections | Generate 71-sample profile | 20 stored profile runs | 179 KB | 26.7 ms |
+
+A Chromium 141 spot check used real IndexedDB and the same adapters, loaded through the Vite development servers (median of five runs, except the single first upload):
+
+| App | Operation | Data size | Median |
+| --- | --- | --- | ---: |
+| 04 Parcel Scenarios | Save one scenario | 2 / 252 / 495 saved scenarios | 9.9 / 223.7 / 284.7 ms |
+| 05 Inspections | Generate 71-sample profile | 0 / 20 stored profile runs | 291.2 / 262.4 ms |
+| 02 Data Quality | First 2,000-polygon x 64-vertex upload (4.9 MB) | Seeded datasets only | 1,143.1 ms |
+| 02 Data Quality | Small upload with 2 x 4.9 MB uploads stored (30 MB state) | 4 datasets | 2,246.4 ms |
+
+Before these limits were added, the same checks found unbounded growth. In Chromium, a parcel save took 0.94 s with 2,000 saved scenarios and a profile run took 0.65 s with 500 stored runs. A small data-quality upload took 4.1 s with 56 MB of stored datasets. The standalone editions now enforce these limits:
+
+- **Parcel scenarios:** at most 500 saved scenarios. Deleting scenarios frees space.
+- **Profile runs:** only the newest 20 completed runs are kept. The workspace lists the newest 10.
+- **Data Quality Portal:** at most 10 MB of uploaded GeoJSON in total, in addition to the 5 MB per-file limit. Each dataset stores its source, validated records and export snapshot, so stored state is about three times the uploaded size.
+
+Civic Works already capped requests (5,000), imports (100) and retained CSV exports (30). The Fleet Monitor already capped history at 360 points per vehicle and 500 events.
+
+These numbers describe single-tab browser work on synthetic data. They are not load tests of the full-stack services. Full-stack throughput, PostGIS query cost and Action Cable fan-out remain unmeasured.
+
 ## Scope of the evidence
 
 The browser checks used locally served production files with internet access for ArcGIS resources. They did not publish GitHub Pages or test a desktop installer, complete offline operation, every device/browser combination, or operational GIS datasets. Simulated roles are not authentication. The mathematical differences from PostGIS and local-storage limits are documented in [COMPARISON.md](COMPARISON.md).

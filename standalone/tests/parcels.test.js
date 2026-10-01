@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seed, handle, calculateScenario, rectangleAreaM2 } from '../04-parcel-scenarios/src/local-api.js';
+import { seed, handle, calculateScenario, rectangleAreaM2, MAX_SCENARIOS } from '../04-parcel-scenarios/src/local-api.js';
 
 const users = [{ id: 1, name: 'Alex Morgan', role: 'staff' }, { id: 2, name: 'Jordan Lee', role: 'reporter' }];
 function context(state = seed(), user = users[0]) {
@@ -70,4 +70,13 @@ test('read routes are side-effect free and spatial/district filters work', () =>
   assert.equal(handle({ path: '/api/parcels', query: new URLSearchParams('bbox=-96.8171,32.7739,-96.8149,32.7756') }, ctx).features.length, 1);
   request(ctx, '/api/scenarios'); request(ctx, '/api/scenarios/1/export');
   assert.equal(JSON.stringify(ctx.state), before);
+});
+
+test('saved scenarios are capped so each browser save stays bounded, and deleting one frees space', () => {
+  const ctx = context();
+  for (let index = ctx.state.scenarios.length; index < MAX_SCENARIOS; index++) request(ctx, '/api/scenarios', 'POST', { scenario: { ...design, name: `Saved ${index}` } });
+  assert.throws(() => request(ctx, '/api/scenarios', 'POST', { scenario: design }), /holds 500 saved scenarios/);
+  assert.equal(ctx.state.scenarios.length, MAX_SCENARIOS);
+  request(ctx, `/api/scenarios/${ctx.state.scenarios[0].id}`, 'DELETE');
+  assert.equal(request(ctx, '/api/scenarios', 'POST', { scenario: design }).name, 'Test courtyard');
 });
