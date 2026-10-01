@@ -2,9 +2,9 @@ const EARTH_RADIUS_M = 6371008.8;
 const SQFT_PER_M2 = 10.76391041671;
 const AREA_METHOD = 'Spherical geographic rectangle area; mean Earth radius 6371008.8 m. This browser edition does not use PostGIS ellipsoidal area.';
 const INITIAL_TIME = '2026-09-29T15:00:00.000Z';
-// Every save rewrites the whole browser dataset; a per-user limit keeps saves well under a
-// second and lets each demo user free space by deleting their own scenarios.
-export const MAX_SCENARIOS_PER_USER = 200;
+// Saves write only changed records, so this limit bounds browser storage and page-open time
+// rather than save cost. It is per user so each demo user can free space by deleting their own.
+export const MAX_SCENARIOS_PER_USER = 1000;
 const round = (value, places = 2) => Number(value.toFixed(places));
 const radians = (degrees) => degrees * Math.PI / 180;
 
@@ -35,7 +35,7 @@ export function calculateScenario(scenario, parcels) {
     units: Math.floor(residential / scenario.unit_area), open_space_sqft: Math.round(siteSqft * (1 - scenario.coverage)), floor_area_ratio: round(scenario.coverage * scenario.floors),
     warnings: chosen.filter((parcel) => scenario.floors > parcel.height_limit).map((parcel) => `${parcel.name}: ${scenario.floors} floors exceeds the synthetic ${parcel.height_limit}-floor limit`),
     assumptions: { residential_efficiency: 0.8, unit_area_sqft: scenario.unit_area, floors: scenario.floors, coverage: scenario.coverage },
-    parcel_snapshot: chosen.map((parcel) => ({ id: parcel.id, name: parcel.name, area_m2: round(parcel.area_m2, 3), boundary: structuredClone(parcel.boundary) })) };
+    parcel_snapshot: chosen.map((parcel) => ({ id: parcel.id, name: parcel.name, area_m2: round(parcel.area_m2, 3), boundary: JSON.parse(JSON.stringify(parcel.boundary)) })) };
 }
 
 export function seed() {

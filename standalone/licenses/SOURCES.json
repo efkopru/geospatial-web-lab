@@ -97,6 +97,14 @@
       "source": "https://raw.githubusercontent.com/bjornharrtell/jsts/2.12.1/license.txt",
       "file": "jsts-license.txt",
       "sha256": "f547c81baffb14b1516e40ef2304aeff0fed0c94b84748e333ad8d8191e90d3f"
+    },
+    {
+      "package": "immer",
+      "version": "11.1.18",
+      "declaredLicense": "MIT",
+      "source": "node_modules/immer/LICENSE",
+      "file": "immer-LICENSE.txt",
+      "sha256": "99cf22f6960a6fe228ec84ea9aefb0d75b27999ece83a3a9801e1c2081fa270b"
     }
   ]
 }

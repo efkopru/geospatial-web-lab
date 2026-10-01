@@ -42,7 +42,7 @@ Each app starts with its own synthetic dataset and a staff demo identity. The **
 
 Role checks demonstrate the original workflow: reporters have restricted request/dataset views, staff can approve or resolve records, and parcel scenarios belong to the selected demo identity. These are local application checks, not authentication or protection against someone controlling the browser.
 
-Each application uses a separate IndexedDB database. Changes persist across reloads on the same browser profile and origin. `localhost`, `127.0.0.1`, different ports and a hosted site are different origins, so they have separate data. An app running in development and the same app inside the built gallery can therefore show different local records. Data is not synchronized with the full-stack databases or other devices.
+Each application uses a separate IndexedDB database. Collections are stored one record per entry and a change writes only what it touched, so saves stay fast as data grows; opening an app reads all of its stored data. Changes persist across reloads on the same browser profile and origin. `localhost`, `127.0.0.1`, different ports and a hosted site are different origins, so they have separate data. An app running in development and the same app inside the built gallery can therefore show different local records. Data is not synchronized with the full-stack databases or other devices.
 
 **Export local backup** downloads the current app's stored state as JSON. **Restore local backup** reads such a file and, after confirmation, replaces only that app's local data with the backup's state. A restore accepts only a backup that meets all of these conditions:
 

@@ -76,7 +76,7 @@ test('saved scenarios are capped per demo user, and only that user\'s deletions 
   const ctx = context();
   const own = () => ctx.state.scenarios.filter(scenario => scenario.user_id === users[0].id).length;
   while (own() < MAX_SCENARIOS_PER_USER) request(ctx, '/api/scenarios', 'POST', { scenario: { ...design, name: `Saved ${own()}` } });
-  assert.throws(() => request(ctx, '/api/scenarios', 'POST', { scenario: design }), /You have 200 saved scenarios/);
+  assert.throws(() => request(ctx, '/api/scenarios', 'POST', { scenario: design }), /You have 1000 saved scenarios/);
   // Another demo user is unaffected by the first user's scenarios.
   const reporter = context(ctx.state, users[1]);
   assert.equal(request(reporter, '/api/scenarios', 'POST', { scenario: design }).user_id, users[1].id);

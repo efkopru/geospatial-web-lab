@@ -133,7 +133,7 @@ export function handle({ path, method = 'GET', body = {} }, context) {
   }
   if (path === '/api/profile_runs' && method === 'GET') return { profile_runs: [...state.profileRuns].sort((a, b) => b.id - a.id).slice(0, 10).map(profilePayload) };
   if (path === '/api/profile_runs' && method === 'POST') {
-    const assets = structuredClone(state.assets).sort((a, b) => a.corridor_order - b.corridor_order || a.id - b.id);
+    const assets = JSON.parse(JSON.stringify(state.assets)).sort((a, b) => a.corridor_order - b.corridor_order || a.id - b.id);
     const result = buildProfile(assets), timestamp = now();
     const run = { id: state.nextProfileId++, user_id: user.id, status: 'completed', generation: 1, created_at: timestamp, completed_at: timestamp, error_message: null, asset_snapshot: assets, ...result };
     state.profileRuns.push(run);
