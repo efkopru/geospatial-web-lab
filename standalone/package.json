@@ -16,7 +16,8 @@
     "build": "node scripts/run.mjs build",
     "preview": "node scripts/run.mjs preview",
     "test": "node --test tests/*.test.js",
-    "test:ui": "vitest run --config vitest.config.js"
+    "test:ui": "vitest run --config vitest.config.js",
+    "verify:site": "node scripts/verify-site.mjs"
   },
   "dependencies": {
     "@arcgis/core": "5.1.26",
