@@ -45,3 +45,10 @@ jobs:
         run: npm run test:ui -- --maxWorkers=1
       - name: Build all five static applications
         run: npm run build
+      - name: Check the built site through the local preview server
+        run: |
+          node scripts/serve.mjs preview &
+          server=$!
+          trap 'kill $server' EXIT
+          for attempt in $(seq 1 20); do curl -fs -o /dev/null http://127.0.0.1:5270/ && break; sleep 1; done
+          npm run verify:site -- http://127.0.0.1:5270/

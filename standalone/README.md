@@ -82,6 +82,12 @@ node scripts/serve.mjs preview
 
 Open [the local gallery](http://127.0.0.1:5270/). Use either this gallery-only command or the combined preview launcher, because both use port 5270. Servers bind to `127.0.0.1`. Relative build paths let the gallery and its app subdirectories be served together by static hosting. Building static files does not publish them or establish a GitHub Pages deployment.
 
+## Publishing a static demo
+
+The manual [Publish standalone demo](../.github/workflows/standalone-pages.yml) workflow tests and builds the suite, checks the built gallery through the local preview server, uploads `standalone/dist` to GitHub Pages and then checks the deployed URL. It runs only when started from the Actions tab, because publishing makes the browser editions public. Before the first run, set **Settings > Pages > Source** to **GitHub Actions**. Pages for a private repository requires a GitHub plan that supports it.
+
+`npm run verify:site -- <url>` checks any served copy of the build, local or hosted. It confirms that the gallery links all five apps and that each app's scripts, styles, icon and third-party notices are served with the expected content types. It also checks the Cesium assets for app 05 and the license copies at the gallery root. A host that answers missing files with its HTML page fails the check. The script does not open a browser, so IndexedDB persistence, WebGL rendering, ArcGIS basemaps and downloads still need a manual check on the deployed URL (see [VERIFICATION.md](VERIFICATION.md)). On a public host, the gallery and app shells hide the links to the local full-stack apps.
+
 Generated `dist`, dependency directories and local output are excluded by this suite's `.gitignore`. Commit source and lockfiles; rebuild static files when preparing a deployment. [Third-party notices](THIRD_PARTY_NOTICES.md) and license copies are included with the app builds and assembled gallery.
 
 ## Verification commands
@@ -90,6 +96,7 @@ Generated `dist`, dependency directories and local output are excluded by this s
 npm test
 npm run test:ui
 npm run build
+npm run verify:site -- http://127.0.0.1:5270/   # while node scripts/serve.mjs preview is running
 ```
 
 Domain and shared-runtime tests cover calculations, validation, simulated permissions, persistence behavior and replay coordination. Interface tests and production builds cover different concerns; none substitutes for browser inspection of WebGL rendering and actual workflows. If a restricted Windows shell prevents Node's test runner from spawning subprocesses, use `node --test --test-isolation=none tests/*.test.js` for the Node test suite.
