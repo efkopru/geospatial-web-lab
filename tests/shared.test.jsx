@@ -15,4 +15,14 @@ describe('shared data contract',()=>{
  });
 });
 it('submits the selected account without dropping credentials',async()=>{const login=vi.fn().mockResolvedValue({id:2});render(<Login onLogin={login} title="Test workspace"/>);fireEvent.click(screen.getByRole('button',{name:'Reporter demo'}));fireEvent.click(screen.getByRole('button',{name:'Open workspace'}));expect(login).toHaveBeenCalledWith({email:'reporter@example.test',password:'Learning123!'});});
+it('omits demo credentials when a build disables demo accounts',()=>{
+ vi.stubEnv('VITE_DEMO_ACCOUNTS','false');
+ try{
+  render(<Login onLogin={vi.fn()} title="Test workspace"/>);
+  expect(screen.getByLabelText('Email')).toHaveValue('');
+  expect(screen.getByLabelText('Password')).toHaveValue('');
+  expect(screen.queryByText(/Learning123!/)).not.toBeInTheDocument();
+  expect(screen.queryByRole('button',{name:'Staff demo'})).not.toBeInTheDocument();
+ }finally{vi.unstubAllEnvs();}
+});
 it('charts preserve exact accessible values',()=>{render(<BarChart items={[{label:'Open',value:6},{label:'Closed',value:2}]}/>);expect(screen.getByRole('img')).toHaveAttribute('aria-label','Open: 6, Closed: 2');});
