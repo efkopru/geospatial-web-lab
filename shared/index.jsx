@@ -1,4 +1,4 @@
-import React, {useState,useEffect,useRef,useCallback,lazy,Suspense} from 'react';
+import React, {useState,useEffect,useRef,lazy,Suspense} from 'react';
 import {createConsumer} from '@rails/actioncable';
 export {useState,useEffect};
 let csrf, sessionUserId, sessionRead, authEpoch=0, sessionRevision=0, sessionRequest=0;
