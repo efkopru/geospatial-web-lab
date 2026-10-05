@@ -4,6 +4,8 @@ Rails.application.configure do
  config.consider_all_requests_local = true
  config.action_controller.allow_forgery_protection = false
  config.active_job.queue_adapter = :test
+ # Keeps failed sign-in counts in memory; each test starts with an empty cache.
+ config.cache_store = :memory_store
  config.active_record.maintain_test_schema = false
  config.hosts.clear
 end
