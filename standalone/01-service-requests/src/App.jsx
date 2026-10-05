@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, useSession, AppShell, Login, GeoMap, BarChart, Stat, useLive, usePolling } from '@geo/shared';
+import { api, useSession, AppShell, Login, GeoMap, BarChart, Stat, useLive, usePolling, downloadJson } from '@geo/shared';
 import './service.css';
 
 const STATUS = { new: 'New', assigned: 'Assigned', in_progress: 'In progress', resolved: 'Resolved' };
@@ -104,10 +104,8 @@ function DataTools({ imports, exports, refresh, onError }) {
   };
   const retry = async (id) => { try { await api(`/api/import_runs/${id}/retry`, { method: 'POST' }); await refresh(); } catch (err) { onError(message(err)); } };
   const createExport = async () => { setBusy(true); try { await api('/api/export_runs', { method: 'POST' }); await refresh(); } catch (err) { onError(message(err)); } finally { setBusy(false); } };
-  const sample = () => {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(SAMPLE, null, 2)], { type: 'application/geo+json' }));
-    const link = document.createElement('a'); link.href = url; link.download = 'sample-service-requests.geojson'; link.click(); URL.revokeObjectURL(url);
-  };
+  // The shared helper keeps the file URL alive until the browser has started the download.
+  const sample = () => downloadJson(SAMPLE, 'sample-service-requests.geojson');
   return <div className="grid-two sr-tools">
     <section className="panel"><span className="sr-eyebrow">BROWSER PROCESSING</span><h2>Import requests</h2><p className="muted">Upload 1 to 500 GeoJSON Point features. Each needs a title and a category: roads, lighting, drainage, or parks. Valid records are imported; rejected rows are listed for correction.</p>
       <div className="sr-drop"><label className="field">GeoJSON file<input ref={fileRef} type="file" accept=".json,.geojson,application/json,application/geo+json" disabled={busy} onChange={e => upload(e.target.files[0])} /></label><button className="secondary" onClick={sample}>Download example</button></div>
