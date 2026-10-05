@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, useSession, Login, AppShell, GeoMap, Stat, BarChart, useLive, usePolling } from '@geo/shared';
 import { cleanSample, errorSample } from './sample-data.js';
 
@@ -18,6 +18,17 @@ function previewViewport(collection) {
   return { center: [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2], zoom: span ? Math.max(2, Math.min(17, Math.log2(360 / span) - 1)) : 15 };
 }
 
+// A dataset's records can run to thousands of features, so they are read again only when
+// its summary changes. While it validates, progress changes every ten features; its records
+// are then read at most every five seconds.
+const DETAIL_INTERVAL_WHILE_VALIDATING = 5000;
+const detailSignature = dataset => [dataset.status, dataset.processed_count, dataset.valid_count, dataset.invalid_count, dataset.updated_at, dataset.version?.id].join('|');
+function needsDetail(loaded, summary) {
+  if (loaded?.id !== summary.id) return true;
+  if (loaded.signature === detailSignature(summary)) return false;
+  return !['queued', 'validating'].includes(summary.status) || Date.now() - loaded.at >= DETAIL_INTERVAL_WHILE_VALIDATING;
+}
+
 function Workspace({ session }) {
   const [datasets, setDatasets] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -35,6 +46,7 @@ function Workspace({ session }) {
   const [filter, setFilter] = useState('all');
   const [dragging, setDragging] = useState(false);
   const detailRequest = useRef(0);
+  const loadedDetail = useRef(null);
   const listRequest = useRef(0);
   const fileRequest = useRef(0);
   const mounted = useRef(false);
@@ -56,16 +68,21 @@ function Workspace({ session }) {
       if (activeUser.current !== userId || listSequence !== listRequest.current) return;
       setDatasets(result.datasets);
       setSelectedId(current => result.datasets.some(dataset => dataset.id === current) ? current : result.datasets[0]?.id ?? null);
-      if (selectedId && activeSelection.current === selectedId && result.datasets.some(dataset => dataset.id === selectedId)) {
+      const summary = result.datasets.find(dataset => dataset.id === selectedId);
+      if (selectedId && activeSelection.current === selectedId && summary && needsDetail(loadedDetail.current, summary)) {
         const request = ++detailRequest.current;
         const data = await api(`/datasets/${selectedId}`);
-        if (request === detailRequest.current && activeUser.current === userId && activeSelection.current === selectedId) setDetail(data);
+        if (request === detailRequest.current && activeUser.current === userId && activeSelection.current === selectedId) {
+          loadedDetail.current = { id: data.id, signature: detailSignature(data), at: Date.now() };
+          setDetail(data);
+        }
       }
     } catch (failure) { if (activeUser.current === userId && listSequence === listRequest.current) setError(failure.message); }
   }, [session.user, selectedId]);
 
   useEffect(() => {
     detailRequest.current += 1;
+    loadedDetail.current = null;
     setDatasets([]); setSelectedId(null); setDetail(null); setError(''); setNotice('');
   }, [session.user?.id]);
   useEffect(() => { refresh(); }, [refresh]);
@@ -97,6 +114,7 @@ function Workspace({ session }) {
 
   function selectDataset(id) {
     detailRequest.current += 1;
+    loadedDetail.current = null;
     activeSelection.current = id;
     setDetail(null); setSelectedId(id); setError(''); setNotice('');
   }
@@ -118,10 +136,9 @@ function Workspace({ session }) {
     });
   }
 
-  if (session.loading) return <div className="empty">Loading data-quality workspace...</div>;
-  if (!session.user) return <Login title="Data quality portal" onLogin={session.login} error={session.error} />;
-
   const active = detail?.id === selectedId ? detail : null;
+  // The map shows accepted records; deriving them here keeps each feature in one place.
+  const preview = useMemo(() => ({ type: 'FeatureCollection', features: (active?.records || []).filter(record => record.accepted).map(record => ({ ...record.feature, id: record.id })) }), [active]);
   const selectedRecord = active?.records.find(record => record.id === recordId);
   const records = (active?.records || []).filter(record => filter === 'all' || (filter === 'valid' ? record.accepted : !record.accepted));
   const complete = active && ['ready', 'approved'].includes(active.status);
@@ -199,7 +216,7 @@ function Workspace({ session }) {
           </div>
 
           <div className="panel"><h2>Accepted feature preview</h2><p>Only features that pass every validation check appear on the map.</p>
-            {active.valid_count > 0 ? <GeoMap key={`${active.id}-${complete ? 'complete' : 'processing'}`} features={active.preview} selectedId={recordId} onSelect={feature => setRecordId(typeof feature === 'object' ? feature.id : feature)} {...previewViewport(active.preview)} /> : <div className="empty">No accepted geometry to preview yet.</div>}
+            {active.valid_count > 0 ? <GeoMap key={`${active.id}-${complete ? 'complete' : 'processing'}`} features={preview} selectedId={recordId} onSelect={feature => setRecordId(typeof feature === 'object' ? feature.id : feature)} {...previewViewport(preview)} /> : <div className="empty">No accepted geometry to preview yet.</div>}
           </div>
 
           <div className="panel">

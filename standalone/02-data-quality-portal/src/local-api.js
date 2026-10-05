@@ -148,8 +148,7 @@ export async function handle({ path, method, body = {} }, { state, user, users, 
   const item = state.datasets.find(value => value.id === Number(match[1]) && visible(value));
   if (!item) fail('Dataset not found for this demo role', 404);
   const action = match[2];
-  if (!action && method === 'GET') return { ...summary(item, users), records: item.records,
-    preview: { type: 'FeatureCollection', features: item.records.filter(value => value.accepted).map(value => ({ ...value.feature, id: value.id })) } };
+  if (!action && method === 'GET') return { ...summary(item, users), records: item.records };
   if (action === 'approve' && method === 'POST') {
     requireStaff();
     if (item.status === 'approved') return { dataset: summary(item, users) };

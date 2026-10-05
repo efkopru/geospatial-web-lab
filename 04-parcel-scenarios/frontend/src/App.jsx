@@ -1,24 +1,27 @@
-import React,{useCallback,useEffect,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {api,useSession,Login,Loading,AppShell,GeoMap,Stat,BarChart,useLive,usePolling,Notice} from '@geo/shared';
 const fmt=n=>Number(n||0).toLocaleString();
 export default function App(){const s=useSession();if(s.loading)return <Loading/>;if(!s.user)return <Login title="Parcel scenario explorer" onLogin={s.login} error={s.error}/>;return <Workspace key={s.user.id} session={s}/>;}
 function Workspace({session}){
  const [parcels,setParcels]=useState([]),[scenarios,setScenarios]=useState([]),[selected,setSelected]=useState([]),[district,setDistrict]=useState(''),[compare,setCompare]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
  const [form,setForm]=useState({name:'New courtyard concept',floors:4,coverage:0.4,unit_area:900});
- const mounted=useRef(true),requestSequence=useRef(0);
+ const mounted=useRef(true),requestSequence=useRef(0),parcelsLoaded=useRef(false);
  const refresh=useCallback(async()=>{
   if(!mounted.current)return;
   const request=++requestSequence.current;
   try{
-   const [p,s]=await Promise.all([api('/api/parcels'),api('/api/scenarios')]);
+   // Parcels are fixed reference data, so live updates and polling refresh only scenarios.
+   const [p,s]=await Promise.all([parcelsLoaded.current?null:api('/api/parcels'),api('/api/scenarios')]);
    if(!mounted.current||request!==requestSequence.current)return;
-   setParcels(p.features);setScenarios(s);
+   if(p){parcelsLoaded.current=true;setParcels(p.features);}
+   setScenarios(s);
   }catch(e){if(mounted.current&&request===requestSequence.current)setError(e.message);}
  },[]);
  useEffect(()=>{mounted.current=true;refresh();return()=>{mounted.current=false;requestSequence.current+=1;};},[refresh]);const live=useLive('ScenarioChannel',refresh);usePolling(refresh,15000);
  const toggle=id=>setSelected(xs=>xs.includes(id)?xs.filter(x=>x!==id):[...xs,id]);
- const visible=parcels.filter(p=>!district||p.properties.district===district);
- const mapFeatures=visible.map(p=>({...p,properties:{...p.properties,color:selected.includes(p.id)?'#cc8529':'#658b72'}}));
+ const visible=useMemo(()=>parcels.filter(p=>!district||p.properties.district===district),[parcels,district]);
+ // Memoized so typing in the form or moving the coverage slider does not redraw the map.
+ const mapFeatures=useMemo(()=>visible.map(p=>({...p,properties:{...p.properties,color:selected.includes(p.id)?'#cc8529':'#658b72'}})),[visible,selected]);
  const area=parcels.filter(p=>selected.includes(p.id)).reduce((s,p)=>s+p.properties.area_acres,0);
  const completed=scenarios.filter(s=>s.status==='complete');const compared=completed.filter(s=>compare.includes(s.id));
  const patch=(key,value)=>setForm({...form,[key]:value});
