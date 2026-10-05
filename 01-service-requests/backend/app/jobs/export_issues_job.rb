@@ -3,6 +3,9 @@ require 'csv'
 class ExportIssuesJob < ApplicationJob
   queue_as :default
   retry_on StandardError, wait: :polynomially_longer, attempts: 3
+  # After these attempts the run stays failed until someone generates a new report. Without
+  # this, Sidekiq's own retries would quietly reprocess it for up to three weeks.
+  sidekiq_options retry: false
 
   def perform(run_id)
     ActiveRecord::Base.connection_pool.with_connection do |connection|
