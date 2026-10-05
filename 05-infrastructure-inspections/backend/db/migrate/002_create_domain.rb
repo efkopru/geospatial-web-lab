@@ -13,8 +13,13 @@ class CreateDomain < ActiveRecord::Migration[8.1]
       t.timestamps
     end
     add_index :infrastructure_assets, :asset_code, unique: true
-    execute "ALTER TABLE infrastructure_assets ADD COLUMN geom geometry(PointZ,4326)"
-    execute "CREATE INDEX index_infrastructure_assets_on_geom ON infrastructure_assets USING GIST (geom)"
+    reversible do |direction|
+      direction.up do
+        execute "ALTER TABLE infrastructure_assets ADD COLUMN geom geometry(PointZ,4326)"
+        execute "CREATE INDEX index_infrastructure_assets_on_geom ON infrastructure_assets USING GIST (geom)"
+      end
+      direction.down { execute "ALTER TABLE infrastructure_assets DROP COLUMN geom" }
+    end
 
     create_table :inspections do |t|
       t.references :infrastructure_asset, null: false, foreign_key: true

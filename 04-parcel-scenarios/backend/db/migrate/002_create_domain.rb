@@ -7,8 +7,13 @@ class CreateDomain < ActiveRecord::Migration[8.1]
    t.jsonb :boundary, null: false
    t.timestamps
   end
-  execute "ALTER TABLE parcels ADD COLUMN geom geometry(Polygon,4326) GENERATED ALWAYS AS (ST_SetSRID(ST_GeomFromGeoJSON(boundary::text),4326)) STORED"
-  execute 'CREATE INDEX index_parcels_geom ON parcels USING gist(geom)'
+  reversible do |direction|
+   direction.up do
+    execute "ALTER TABLE parcels ADD COLUMN geom geometry(Polygon,4326) GENERATED ALWAYS AS (ST_SetSRID(ST_GeomFromGeoJSON(boundary::text),4326)) STORED"
+    execute 'CREATE INDEX index_parcels_geom ON parcels USING gist(geom)'
+   end
+   direction.down { execute 'ALTER TABLE parcels DROP COLUMN geom' }
+  end
   add_index :parcels, :name, unique: true
   create_table :scenarios do |t|
    t.references :user, null: false, foreign_key: true
