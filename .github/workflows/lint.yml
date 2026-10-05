@@ -1,0 +1,63 @@
+name: Lint and scan
+
+# Static checks for every change, including standalone-only changes: ESLint over the full-stack
+# and standalone JavaScript, and Brakeman over each Rails backend.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eslint:
+    name: ESLint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Lint JavaScript
+        run: npm run lint
+
+  brakeman:
+    name: Brakeman
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: Install Brakeman
+        run: gem install brakeman --version 8.1.0 --no-document
+      # The lockfiles record the Ruby that last ran bundle on the local WSL setup (3.2.3).
+      # CI and the container images run Ruby 3.4, so the end-of-life Ruby check is excluded.
+      - name: Scan each Rails backend
+        run: |
+          status=0
+          for backend in 0*/backend; do
+            echo "::group::$backend"
+            brakeman --no-pager --quiet --except EOLRuby "$backend" || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"

@@ -3,7 +3,10 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "workspaces": ["shared", "0*/frontend"],
+  "workspaces": [
+    "shared",
+    "0*/frontend"
+  ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
@@ -12,10 +15,18 @@
     "dev:2": "npm run dev --workspace @geo/data-quality-portal",
     "dev:3": "npm run dev --workspace @geo/fleet-monitor",
     "dev:4": "npm run dev --workspace @geo/parcel-scenarios",
-    "dev:5": "npm run dev --workspace @geo/infrastructure-inspections"
+    "dev:5": "npm run dev --workspace @geo/infrastructure-inspections",
+    "lint": "eslint ."
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2", "@testing-library/react": "^16.3.2",
-    "@testing-library/jest-dom": "^6.9.1", "jsdom": "^28.1.0", "vitest": "^4.0.18"
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.58.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "jsdom": "^28.1.0",
+    "vitest": "^4.0.18"
   }
 }

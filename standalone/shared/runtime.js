@@ -85,7 +85,7 @@ export function createRuntime({id,seed,handle,start,prepareRestore,store=new Loc
   if(!validated.has(value)){shape??=(async()=>{const reference=await seed();return {reference,shapes:recordShapes(reference)};})();const {reference,shapes}=await shape;const state=checkBackup(value,id,reference,shapes);prepareRestore?.(state);validated.set(value,state);}
   return validated.get(value);
  };
- const persist=async(draft,baseRevision=dataRevision,base)=>{const value=envelope(draft,baseRevision);try{await store.put(value,{expectedRevision:baseRevision,base});}catch(error){if(error.status===409)throw error;throw new Error(`Changes were not saved: ${error.message}. Export a backup or free browser storage.`);}apply(value);meta.error='';};
+ const persist=async(draft,baseRevision=dataRevision,base)=>{const value=envelope(draft,baseRevision);try{await store.put(value,{expectedRevision:baseRevision,base});}catch(error){if(error.status===409)throw error;throw new Error(`Changes were not saved: ${error.message}. Export a backup or free browser storage.`,{cause:error});}apply(value);meta.error='';};
  // Reset and restore publish a whole replacement state as one revision-checked write.
  const replaceState=next=>store.exclusive(async()=>{const previousRevision=store.revision?await store.revision():(await store.get())?._revision||0;await persist(next,previousRevision);revision++;broadcast();notify('reset');});
  const runtime={id,meta,users:USERS,
