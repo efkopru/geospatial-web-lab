@@ -118,6 +118,8 @@ Use separate browser profiles or a normal and private window for simultaneous us
 
 Sessions expire after 24 hours. Logout revokes that login on the server. Account changes discard the previous account's drafts. Reauthenticate after an expired session or an upgrade that invalidates older cookies.
 
+Failed sign-ins are limited: five for one email, or twenty from one address, within 15 minutes, after which the API answers "Too many failed sign-in attempts" until the window passes. Successful sign-ins are never counted and clear that email's failures.
+
 ## 5. Demonstrate each workflow
 
 ### Service requests
@@ -177,7 +179,9 @@ From the root in PowerShell:
 
 ```powershell
 npm test
+npm run lint
 node --test tests/runtime-scripts.node.mjs
+node --test tests/shared-copies.node.mjs
 npm run build
 npx playwright install chromium
 ```
@@ -203,7 +207,7 @@ docker compose up --build -d
 docker compose exec api bundle exec rails db:seed
 ```
 
-The configuration script generates missing secrets for all five projects and preserves existing secrets. Seeding is optional and creates known demo credentials. Each Compose stack includes nginx, Rails, Sidekiq, PostGIS, and Redis. Migrations run before API and worker startup. `docker compose down` stops the stack while preserving volumes. Do not add `-v` when preserving data.
+The configuration script generates missing secrets for all five projects and preserves existing secrets. Seeding is optional and creates known demo credentials. The sign-in form prefills them unless `.env` sets `DEMO_ACCOUNTS=false` before the build; the form then starts empty and the bundle omits the demo password. Each Compose stack includes nginx, Rails, Sidekiq, PostGIS, and Redis. Migrations run before API and worker startup. `docker compose down` stops the stack while preserving volumes. Do not add `-v` when preserving data.
 
 For an older database volume, back it up, generate the new application password, then run:
 
@@ -213,7 +217,7 @@ docker compose exec db bash /docker-entrypoint-initdb.d/20-geolab.sh
 docker compose up --build -d
 ```
 
-The administrator initialization step grants the separate application role ownership of application tables while retaining administrator ownership of PostGIS. Do not delete the volume to upgrade it. Public hosting additionally requires HTTPS, real host/origin allowlists, secure cookies, consistent proxy/SSL configuration, and replacement of demo credentials. The full-stack applications are not publicly hosted.
+The administrator initialization step grants the separate application role ownership of application tables while retaining administrator ownership of PostGIS. Do not delete the volume to upgrade it. Public hosting additionally requires HTTPS, real host/origin allowlists, secure cookies, consistent proxy/SSL configuration, and replacement of demo credentials, including a frontend built with `DEMO_ACCOUNTS=false`. The full-stack applications are not publicly hosted.
 
 ## 8. Preserve and recover data
 
@@ -236,6 +240,8 @@ For the default local WSL arrangement, `sudo bash scripts/verify-backup.sh` chec
 | Browser cannot connect | Check both launcher terminals and the correct port. Stop duplicate launchers before restarting. |
 | Missing gems or tables | Run backend `bundle install`, bootstrap, and migrations. Seeds are needed only for demo preparation. |
 | Jobs remain queued | Check Redis and the project's worker. Inspect `.runtime/<project>-worker.log` for combined launches. |
+| A run shows failed | Fix the cause, then use the app's retry action. Failed imports, exports, validations, and scenarios are not retried automatically by the worker. |
+| Sign-in says "Too many failed sign-in attempts" | Wait 15 minutes, or clear the counts in that backend with `bundle exec rails runner 'Rails.cache.clear'` (in Compose: `docker compose exec api bundle exec rails runner 'Rails.cache.clear'`). |
 | API fails during startup | Inspect `.runtime/<project>-api.log`; check PostgreSQL, credentials, and migrations. |
 | Live indicator is offline | Polling can recover persisted state. Check API, Redis, and WebSocket connectivity. |
 | Blank map or scene | Check internet access for ArcGIS and WebGL support. Continue through the linked register where available. |
