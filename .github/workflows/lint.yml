@@ -1,7 +1,8 @@
 name: Lint and scan
 
 # Static checks for every change, including standalone-only changes: ESLint over the full-stack
-# and standalone JavaScript, and Brakeman over each Rails backend.
+# and standalone JavaScript, a check that copied files are still identical, and Brakeman over
+# each Rails backend.
 on:
   push:
     branches: [main]
