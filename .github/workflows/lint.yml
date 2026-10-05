@@ -34,6 +34,8 @@ jobs:
         run: npm ci
       - name: Lint JavaScript
         run: npm run lint
+      - name: Check that copied files are still identical
+        run: node --test tests/shared-copies.node.mjs
 
   brakeman:
     name: Brakeman
