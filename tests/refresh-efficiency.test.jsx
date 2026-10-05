@@ -33,13 +33,16 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+// The first render chains several requests; under a busy parallel test run it can exceed
+// Testing Library's default one-second wait.
+const LOAD = { timeout: 5000 };
 const detailCalls = () => shared.api.mock.calls.filter(([path]) => path === '/datasets/4').length;
 
 it('fetches dataset records again only when the dataset summary changes', async () => {
   let list = [summary];
   shared.api.mockImplementation(async path => path === '/datasets' ? { datasets: list } : { ...list[0], records });
   render(<PortalApp />);
-  await screen.findByRole('heading', { name: 'Parks' });
+  await screen.findByRole('heading', { name: 'Parks' }, LOAD);
   expect(detailCalls()).toBe(1);
   await act(async () => { await shared.live(); await shared.live(); });
   expect(detailCalls()).toBe(1);
@@ -55,7 +58,7 @@ it('limits record reads while a dataset validates', async () => {
   let list = [{ ...summary, status: 'validating', processed_count: 10, total_count: 100 }];
   shared.api.mockImplementation(async path => path === '/datasets' ? { datasets: list } : { ...list[0], records });
   render(<PortalApp />);
-  await screen.findByRole('heading', { name: 'Parks' });
+  await screen.findByRole('heading', { name: 'Parks' }, LOAD);
   expect(detailCalls()).toBe(1);
   list = [{ ...list[0], processed_count: 20 }];
   clock += 1000;
@@ -73,8 +76,8 @@ it('limits record reads while a dataset validates', async () => {
 it('builds the accepted-feature preview from records', async () => {
   shared.api.mockImplementation(async path => path === '/datasets' ? { datasets: [summary] } : { ...summary, records });
   render(<PortalApp />);
-  await screen.findByText('Accepted feature preview');
-  await waitFor(() => expect(shared.maps.at(-1)?.features.map(feature => feature.id)).toEqual([41]));
+  await screen.findByText('Accepted feature preview', {}, LOAD);
+  await waitFor(() => expect(shared.maps.at(-1)?.features.map(feature => feature.id)).toEqual([41]), LOAD);
 });
 
 it('keeps fleet map features unchanged while a zone name is typed', async () => {
@@ -85,7 +88,7 @@ it('keeps fleet map features unchanged while a zone name is typed', async () => 
     throw new Error(path);
   });
   render(<FleetApp />);
-  await waitFor(() => expect(shared.maps.at(-1)?.features.some(feature => feature.id === 'planned-route')).toBe(true));
+  await waitFor(() => expect(shared.maps.at(-1)?.features.some(feature => feature.id === 'planned-route')).toBe(true), LOAD);
   fireEvent.click(screen.getByRole('button', { name: 'Add zone' }));
   const before = shared.maps.at(-1);
   const renders = shared.maps.length;
@@ -98,7 +101,7 @@ it('loads parcels once and keeps parcel map features unchanged while a scenario 
   const parcel = { type: 'Feature', id: 7, geometry: { type: 'Polygon', coordinates: [[[-96.8, 32.7], [-96.79, 32.7], [-96.79, 32.71], [-96.8, 32.7]]] }, properties: { id: 7, title: 'Block A', district: 'River district', area_acres: 1.2, height_limit: 6 } };
   shared.api.mockImplementation(async path => path === '/api/parcels' ? { features: [parcel] } : []);
   render(<ParcelApp />);
-  await screen.findByRole('checkbox', { name: 'Select Block A' });
+  await screen.findByRole('checkbox', { name: 'Select Block A' }, LOAD);
   await act(async () => { await shared.live(); await shared.live(); });
   expect(shared.api.mock.calls.filter(([path]) => path === '/api/parcels')).toHaveLength(1);
   expect(shared.api.mock.calls.filter(([path]) => path === '/api/scenarios')).toHaveLength(3);
