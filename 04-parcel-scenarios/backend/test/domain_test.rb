@@ -54,4 +54,7 @@ class ScenarioApiTest < ActionDispatch::IntegrationTest
   get "/api/scenarios/#{s.id}";assert_response :not_found
   get '/api/parcels',params:{bbox:'bad'};assert_response :unprocessable_entity
  end
+ test 'a failed calculation is retried from the app, not by Sidekiq' do
+  assert_equal false,CalculateScenarioJob.get_sidekiq_options['retry']
+ end
 end

@@ -70,6 +70,7 @@ services:
       dockerfile: scripts/Frontend.Dockerfile
       args:
         PROJECT: 01-service-requests
+        DEMO_ACCOUNTS: ${DEMO_ACCOUNTS:-true}
     ports: ["127.0.0.1:5171:80"]
     depends_on:
       api: {condition: service_healthy}

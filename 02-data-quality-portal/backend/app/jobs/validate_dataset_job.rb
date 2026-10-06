@@ -1,6 +1,9 @@
 class ValidateDatasetJob < ApplicationJob
   queue_as :default
   retry_on ActiveRecord::ConnectionNotEstablished, wait: 5.seconds, attempts: 3
+  # A failed dataset stays failed until someone retries it in the app. Without this,
+  # Sidekiq's own retries would quietly revalidate it for up to three weeks.
+  sidekiq_options retry: false
 
   def perform(dataset_id)
     dataset = Dataset.find(dataset_id)

@@ -221,4 +221,8 @@ class DatasetApiTest < ActionDispatch::IntegrationTest
     end
     assert_equal "queued", dataset.reload.status
   end
+
+  test "a failed validation is left for the user instead of Sidekiq retries" do
+    assert_equal false, ValidateDatasetJob.get_sidekiq_options["retry"]
+  end
 end

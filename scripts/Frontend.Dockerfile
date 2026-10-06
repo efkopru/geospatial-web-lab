@@ -9,7 +9,9 @@ COPY 04-parcel-scenarios/frontend ./04-parcel-scenarios/frontend
 COPY 05-infrastructure-inspections/frontend ./05-infrastructure-inspections/frontend
 RUN npm ci
 ARG PROJECT
-RUN npm run build --workspace ./${PROJECT}/frontend && cp -r ${PROJECT}/frontend/dist /site
+# true prefills the seeded learning accounts on the sign-in form; false hides them.
+ARG DEMO_ACCOUNTS=true
+RUN VITE_DEMO_ACCOUNTS="$DEMO_ACCOUNTS" npm run build --workspace ./${PROJECT}/frontend && cp -r ${PROJECT}/frontend/dist /site
 FROM nginx:alpine
 COPY scripts/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /site /usr/share/nginx/html

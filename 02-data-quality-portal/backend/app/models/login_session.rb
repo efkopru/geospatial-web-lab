@@ -4,6 +4,9 @@ class LoginSession < ApplicationRecord
   scope :active, -> { where(revoked_at: nil).where('expires_at > ?', Time.current) }
 
   def self.issue!(user)
+    # Expired rows can never authenticate again, so each sign-in clears them out. Revoked
+    # rows are kept until they expire.
+    where('expires_at <= ?', Time.current).delete_all
     token = SecureRandom.hex(32)
     record = create!(user: user, token_digest: Digest::SHA256.hexdigest(token), expires_at: 24.hours.from_now)
     [record, token]

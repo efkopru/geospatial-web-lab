@@ -12,10 +12,10 @@ module Api
     end
 
     def show
+      # The browser builds its map preview from the accepted records, so each feature is sent once.
       records = @dataset.dataset_records.order(:ordinal)
       render json: @dataset.summary(version: Dataset.version_summaries([@dataset.id])[@dataset.id]).merge(
-        "records" => records.map { |record| record.as_json(only: %i[id ordinal feature accepted validation_errors]) },
-        "preview" => { "type" => "FeatureCollection", "features" => records.select(&:accepted).map { |record| record.feature.merge("id" => record.id) } }
+        "records" => records.map { |record| record.as_json(only: %i[id ordinal feature accepted validation_errors]) }
       )
     end
 
