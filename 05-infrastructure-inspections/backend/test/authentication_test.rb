@@ -63,6 +63,65 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
     assert_not_equal token, record.token_digest
   end
 
+  test 'repeated failed sign-ins for an email are throttled; successful sign-ins are not counted' do
+    6.times do
+      post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
+      assert_response :success
+    end
+    5.times do |attempt|
+      # Email case and surrounding spaces do not start a separate count.
+      post '/api/session', params: {email: attempt.even? ? @user.email : " #{@user.email.upcase} ", password: 'wrong password'}, as: :json
+      assert_response :unauthorized
+    end
+    post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
+    assert_response :too_many_requests
+    assert_match 'Too many failed sign-in attempts', response.parsed_body['error']
+    other = User.create!(email: 'auth-other@example.test', name: 'Other user', password: 'Learning123!', role: 'reporter')
+    post '/api/session', params: {email: other.email, password: 'Learning123!'}, as: :json
+    assert_response :success
+  end
+
+  test 'failed sign-ins from one address are throttled across emails' do
+    20.times do |attempt|
+      post '/api/session', params: {email: "guess-#{attempt}@example.test", password: 'wrong password'}, as: :json
+      assert_response :unauthorized
+    end
+    post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
+    assert_response :too_many_requests
+  end
+
+  test 'a successful sign-in clears the failed attempts for that email' do
+    4.times { post '/api/session', params: {email: @user.email, password: 'wrong password'}, as: :json }
+    post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
+    assert_response :success
+    4.times do
+      post '/api/session', params: {email: @user.email, password: 'wrong password'}, as: :json
+      assert_response :unauthorized
+    end
+    post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
+    assert_response :success
+  end
+
+  test 'unknown emails and blank passwords are rejected like wrong passwords' do
+    post '/api/session', params: {email: 'nobody@example.test', password: 'Learning123!'}, as: :json
+    assert_response :unauthorized
+    assert_equal 'Incorrect email or password', response.parsed_body['error']
+    post '/api/session', params: {email: @user.email, password: ''}, as: :json
+    assert_response :unauthorized
+    assert_equal 'Incorrect email or password', response.parsed_body['error']
+  end
+
+  test 'signing in removes expired login sessions and keeps revoked ones until expiry' do
+    expired, = LoginSession.issue!(@user)
+    expired.update!(expires_at: 1.minute.ago)
+    revoked, = LoginSession.issue!(@user)
+    revoked.update!(revoked_at: Time.current)
+    post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
+    assert_response :success
+    assert_not LoginSession.exists?(expired.id)
+    assert LoginSession.exists?(revoked.id)
+  end
+
   test 'live connection becomes invalid after an account role change' do
     record, = LoginSession.issue!(@user)
     connection = ApplicationCable::Connection.new(ActionCable.server, {})

@@ -67,6 +67,17 @@ script="$(grep -o 'assets/[^"]*\.js' <<<"$index" | head -1 || true)"
 [[ "$(curl -fsS "$base/api/session")" == *'"csrf_token"'* ]] || fail "/api/session through the web proxy did not return a CSRF token"
 step "frontend, /up and /api/session respond through nginx"
 
+# Header names are compared in lower case.
+index_headers="$(curl -fsS -D - -o /dev/null "$base/" | tr -d '\r' | tr '[:upper:]' '[:lower:]')"
+[[ "$index_headers" == *'x-content-type-options: nosniff'* ]] || fail "the page is served without X-Content-Type-Options"
+[[ "$index_headers" == *'x-frame-options: deny'* ]] || fail "the page is served without X-Frame-Options"
+[[ "$index_headers" == *'cache-control: no-cache'* ]] || fail "the page is cacheable, so a new deployment may not be picked up"
+asset_headers="$(curl -fsS -D - -o /dev/null -H 'Accept-Encoding: gzip' "$base/$script" | tr -d '\r' | tr '[:upper:]' '[:lower:]')"
+[[ "$asset_headers" == *'content-encoding: gzip'* ]] || fail "the frontend bundle is not compressed"
+[[ "$asset_headers" == *'cache-control: max-age=31536000'* ]] || fail "the hashed frontend bundle is not cached long-term"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' "$base/assets/missing-file.js")" == 404 ]] || fail "a missing asset did not return 404"
+step "nginx sends security headers, compresses and caches the bundle"
+
 "${compose[@]}" exec -T api bundle exec rails db:seed >/dev/null || fail "db:seed failed in the API container"
 step "seed data loaded inside the API container"
 

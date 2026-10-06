@@ -1,10 +1,23 @@
 name: Verify five applications
-on: [push, pull_request]
+# Pull requests and main are verified once each; feature-branch pushes are covered by their pull
+# request. Standalone, documentation and output-only changes do not affect the full-stack apps;
+# the standalone and lint workflows cover those.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['standalone/**', '**.md', 'output/**']
+  pull_request:
+    paths-ignore: ['standalone/**', '**.md', 'output/**']
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     services:
       postgres:
         image: postgis/postgis:17-3.5
@@ -18,8 +31,10 @@ jobs:
         image: redis:7-alpine
         ports: ['6379:6379']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -42,8 +57,15 @@ jobs:
           sudo apt-get install -y --no-install-recommends postgresql-client-17
           echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
       - run: npm ci
+      # The five backends share two lockfiles, so one gem directory serves all of them.
+      - name: Cache backend gems
+        uses: actions/cache@v4
+        with:
+          path: ~/vendor/bundle
+          key: backend-gems-${{ runner.os }}-ruby3.4-${{ hashFiles('0*/backend/Gemfile.lock') }}
       - name: Install every backend lockfile
         run: |
+          bundle config set --global path "$HOME/vendor/bundle"
           for backend in 0*/backend; do (cd "$backend" && bundle install); done
       - name: Create databases and PostGIS
         env:

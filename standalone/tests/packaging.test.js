@@ -14,11 +14,10 @@ function processFixture(){
 }
 async function tempFixture(fn){
  const parent=resolve(tmpdir()),directory=await mkdtemp(join(parent,'geolab-packaging-'));
- try{return await fn(directory);}finally{
-  const target=resolve(directory);
-  if(!target.startsWith(parent+sep)||!target.slice(parent.length+1).startsWith('geolab-packaging-'))throw new Error('Refusing unsafe test cleanup');
-  await rm(target,{recursive:true,force:true});
- }
+ const target=resolve(directory);
+ // Checked before the test runs: throwing from finally would hide the test's own failure.
+ if(!target.startsWith(parent+sep)||!target.slice(parent.length+1).startsWith('geolab-packaging-'))throw new Error('Refusing unsafe test cleanup');
+ try{return await fn(directory);}finally{await rm(target,{recursive:true,force:true});}
 }
 async function response(handler,url,method='GET'){
  const result={};

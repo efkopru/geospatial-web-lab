@@ -1,4 +1,7 @@
 class CalculateScenarioJob < ApplicationJob
+ # A failed scenario is retried from the app, which advances its revision. Sidekiq's own
+ # retries would only find it failed and log the same error again for weeks.
+ sidekiq_options retry: false
  def perform(id, revision)
   scenario = Scenario.find_by(id: id)
   return unless scenario

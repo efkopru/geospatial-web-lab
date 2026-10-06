@@ -61,7 +61,7 @@ The local verification record uses Rails 8.1.4, React 19.3, ArcGIS Maps SDK 5.1.
 
 After seeding, sign in with `staff@example.test` or `reporter@example.test`, password `Learning123!`. These are learning accounts only. Staff can manage operational workflows; reporters have restricted access enforced by Rails. Each app uses a different session cookie.
 
-Sessions expire after 24 hours and can be revoked on the server. Logout invalidates copied cookies and disconnects that login's live subscriptions. If notification delivery is unavailable, subscriptions recheck authorization every 15 seconds. The session migration invalidates cookies from older application revisions; sign in again after upgrading.
+Sessions expire after 24 hours and can be revoked on the server. Failed sign-ins are limited to five per email and twenty per client address in 15 minutes; successful sign-ins are not counted. Logout invalidates copied cookies and disconnects that login's live subscriptions. If notification delivery is unavailable, subscriptions recheck authorization every 15 seconds. The session migration invalidates cookies from older application revisions; sign in again after upgrading.
 
 Login and logout changes propagate to other tabs for the same application. Account changes discard the previous account's drafts. Returning to a tab rechecks its session while preserving drafts when the account is unchanged.
 
@@ -119,7 +119,7 @@ docker compose up --build -d
 docker compose exec api bundle exec rails db:seed
 ```
 
-Compose builds the selected frontend from the parent npm workspace. It runs nginx, Rails/Puma, a separate Sidekiq worker, PostGIS, and Redis. Database and Redis volumes persist across container restarts. Services restart after failures. The Rails image runs as a non-root user. PostgreSQL initializes PostGIS as administrator and grants a separate `geolab_app` role ownership of application tables; Rails never receives the administrator password. Migrations finish before API and worker startup and do not create demo accounts. Application ports bind only to localhost by default. Use all five Compose files to run all five independent stacks.
+Compose builds the selected frontend from the parent npm workspace. It runs nginx, Rails/Puma, a separate Sidekiq worker, PostGIS, and Redis. Database and Redis volumes persist across container restarts. Services restart after failures. The Rails image runs as a non-root user. PostgreSQL initializes PostGIS as administrator and grants a separate `geolab_app` role ownership of application tables; Rails never receives the administrator password. Migrations finish before API and worker startup and do not create demo accounts. Application ports bind only to localhost by default. nginx sends security headers, compresses text assets, caches Vite's content-hashed files for a year, and revalidates `index.html` on every visit. The sign-in form prefills the learning accounts unless `.env` sets `DEMO_ACCOUNTS=false` before the build; use that setting for a stack that is not seeded. Use all five Compose files to run all five independent stacks.
 
 The backend image pins Ruby 3.4 on Debian trixie and explicitly installs the PostgreSQL 17 client to match the database service. CI also installs client 17; PostgreSQL's dump utility cannot read a server with a newer major version than the client.
 
@@ -127,15 +127,17 @@ The backend image pins Ruby 3.4 on Debian trixie and explicitly installs the Pos
 
 For a volume created by an older revision, first generate the new `APP_DATABASE_PASSWORD`, then run `docker compose up -d db` and `docker compose exec db bash /docker-entrypoint-initdb.d/20-geolab.sh` before starting the full stack. This idempotent administrator step grants the new application role ownership of existing application tables while leaving PostGIS extension objects with the administrator. Back up the database first; do not delete a volume to upgrade it.
 
-For an external deployment, provision HTTPS, set `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` to the real host, enable `SECURE_COOKIES`, configure trusted TLS termination and `FORCE_SSL` consistently, replace demo credentials, and keep secrets outside source control. The nginx configuration handles same-origin API requests and WebSocket upgrades. The full-stack applications have no public hosting.
+For an external deployment, provision HTTPS, set `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` to the real host, enable `SECURE_COOKIES`, configure trusted TLS termination and `FORCE_SSL` consistently, replace demo credentials and build the frontend with `DEMO_ACCOUNTS=false`, and keep secrets outside source control. The nginx configuration handles same-origin API requests and WebSocket upgrades. The full-stack applications have no public hosting.
 
 ## Verification
 
-The application audit dated **2026-09-29** recorded 109 backend tests with 690 assertions, 44 frontend tests across 10 suites, 13 Playwright scenarios against real services, and five successful frontend builds. All five Compose configurations parsed successfully. These are recorded results, not new test runs performed while authoring the documentation.
+The application audit dated **2026-09-29** recorded 109 backend tests with 690 assertions, 44 frontend tests across 10 suites, 13 Playwright scenarios against real services, and five successful frontend builds. All five Compose configurations parsed successfully. These are recorded results, not new test runs performed while authoring the documentation. A local re-run on **2026-10-04** recorded 138 backend tests with 949 assertions and 50 frontend tests across 11 suites, with ESLint and Brakeman reporting no errors or warnings that fail the build; see [VERIFICATION.md](VERIFICATION.md#review-fixes-october-4-2026).
 
 ```powershell
 npm test
+npm run lint
 node --test tests/runtime-scripts.node.mjs
+node --test tests/shared-copies.node.mjs
 npm run build
 wsl -d Ubuntu -u root -- bash "$wslProject/tests/runtime-shell.test.sh"
 wsl -d Ubuntu -u root -- bash "$wslProject/scripts/test-backends.sh"
@@ -148,7 +150,7 @@ Backend suites exercise PostGIS operations, validation, ownership and staff perm
 
 Tests explicitly migrate their test databases. Rails automatic test schema replacement is disabled because a restricted app role must not drop/recreate the administrator-owned PostGIS extension. `db/structure.sql` captures native spatial/generated columns and database constraints.
 
-Browser tests add synthetic records to development databases. Docker image builds and container runtime could not be verified locally because the engine could not start. The [container workflow](.github/workflows/containers.yml) builds and smoke-tests each stack on GitHub Actions; all five passed on October 1, 2026 (see [VERIFICATION.md](VERIFICATION.md#container-verification-october-1-2026)). The [GitHub workflow](.github/workflows/ci.yml) repeats validation on pushes and pull requests; its run status is separate from the dated local results above. The full-stack applications have no public deployment; only the standalone browser editions are published (see [standalone/README.md](standalone/README.md#publishing-a-static-demo)). Successful builds and Compose parsing do not establish deployment readiness.
+Browser tests add synthetic records to development databases. Docker image builds and container runtime could not be verified locally because the engine could not start. The [container workflow](.github/workflows/containers.yml) builds and smoke-tests each stack on GitHub Actions; all five passed on October 1, 2026 (see [VERIFICATION.md](VERIFICATION.md#container-verification-october-1-2026)). The [GitHub workflow](.github/workflows/ci.yml) repeats validation on pull requests and `main`; its run status is separate from the dated local results above. The [lint workflow](.github/workflows/lint.yml) runs ESLint, Brakeman, and a check that intentionally copied files are still identical on every change. The full-stack applications have no public deployment; only the standalone browser editions are published (see [standalone/README.md](standalone/README.md#publishing-a-static-demo)). Successful builds and Compose parsing do not establish deployment readiness.
 
 ## Backup and restore
 

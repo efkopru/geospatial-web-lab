@@ -170,4 +170,10 @@ class RequestUpdatesChannelTest < ActionCable::Channel::TestCase
     assert_has_stream "service_requests:user:#{user.id}"
     assert_equal ["service_requests:user:#{user.id}"], subscription.streams
   end
+
+  test 'failed import and export runs are left for the user instead of Sidekiq retries' do
+    [ImportIssuesJob, ExportIssuesJob].each do |job|
+      assert_equal false, job.get_sidekiq_options['retry'], "#{job} must not be reprocessed after it reports failure"
+    end
+  end
 end

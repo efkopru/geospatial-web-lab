@@ -97,6 +97,27 @@ The first run found one defect. The Data Quality dataset list took 140.6 ms for 
 
 These are single-runner measurements on synthetic data, without a load balancer, TLS, or production tuning. They show where time goes and catch regressions. They are not capacity guarantees. Validating a large upload is the slowest workflow (about 10 s for 2,000 complex polygons); it runs in the background while the client polls. Action Cable fan-out under many subscribers was not measured.
 
+## Review fixes (October 4, 2026)
+
+Checked locally on the review-fixes branch in the same WSL runtime.
+
+| Project | Tests | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Service requests | 31 | 233 | Passed |
+| Data quality portal | 28 | 193 | Passed |
+| Fleet monitor | 25 | 154 | Passed |
+| Parcel scenarios | 24 | 151 | Passed |
+| Infrastructure inspections | 30 | 218 | Passed |
+| Total | 138 | 949 | No failures, errors, or skipped tests |
+
+- New backend coverage: failed sign-in limits per email and per address, `authenticate_by` rejections, expired-session pruning, and the Sidekiq retry policy of the import, export, validation, and scenario jobs.
+- The parcel and inspection domain migrations rolled back to version 1 and migrated again on throwaway databases.
+- 50 frontend tests passed across 11 suites, including refetch limits in the data portal, memoized map features in the fleet and parcel apps, and the sign-in form without demo accounts. The standalone editions passed 70 domain and storage tests and 10 interface tests; the built standalone site passed `verify:site` (29 URLs) and `verify:browser` against a local preview. The copied-file check passed 28 comparisons.
+- ESLint reported no errors and 21 hook-dependency warnings. Brakeman 8.1.0 reported no warnings for any backend with the end-of-life Ruby check excluded; that check flags the local Ruby 3.2.3, which reached end of life on 2026-03-31. CI and the container images use Ruby 3.4.
+- All five Vite builds passed. The inspections entry bundle is 263 KB (82 KB gzipped), down from 4.43 MB (1.21 MB gzipped), because the Cesium viewer now loads in its own chunk.
+- `scripts/nginx.conf` was run with nginx 1.24 against the built service-requests frontend: security headers on pages, assets and proxied responses; `no-cache` for `index.html` and client routes; a one-year cache and gzip for hashed assets; and 404 for a missing asset.
+- Not run locally: the Playwright scenarios against running services and the container image builds (the Docker engine is unavailable here). The CI and container workflows run both.
+
 ## Boundaries
 
 Docker Desktop's engine failed to start in the original audit environment, so container image builds and runtime execution were **not verified** locally. They were later verified on GitHub Actions; see [Container verification](#container-verification-october-1-2026). The same applications were run and tested directly in WSL. At the time of this local audit, the workspace had not yet been published and remote CI had not run. Subsequent CI results are recorded in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions). No public application hosting was created then. The standalone browser editions were later published as a static demo; see the [standalone verification record](standalone/VERIFICATION.md#public-deployment-october-1-2026). The full-stack applications remain unhosted.

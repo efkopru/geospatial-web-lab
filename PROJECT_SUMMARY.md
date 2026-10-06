@@ -37,7 +37,7 @@ Rails applies permissions and validation before database writes. PostGIS supplie
 
 **Keep committed results independent of notifications.** Notification outages previously could make successful database operations appear to fail. Notifications now fail separately from durable writes; clients recover current state. Queue rejection and late acknowledgement paths preserve work already started or completed.
 
-**Protect concurrent work and account boundaries.** Optimistic locking blocks stale request and inspection edits. Job generations and revisions prevent obsolete work from replacing newer results. Frontend sequencing guards against delayed reads, uploads, and saves. Revocable login tokens invalidate copied cookies after logout, while cross-tab changes remove the previous account's workspace and draft.
+**Protect concurrent work and account boundaries.** Optimistic locking blocks stale request and inspection edits. Job generations and revisions prevent obsolete work from replacing newer results. Frontend sequencing guards against delayed reads, uploads, and saves. Revocable login tokens invalidate copied cookies after logout, while cross-tab changes remove the previous account's workspace and draft. Repeated failed sign-ins are throttled, and failed background runs wait for an explicit retry instead of reprocessing later.
 
 **Make spatial assumptions explicit.** Polygon winding is normalized for map rendering without changing source geometry. Profile samples follow geodesics across the antimeridian. Parcel areas use PostGIS geography. Approved dataset versions have database-level immutability; completed calculations and profiles preserve source snapshots for reproducible exports.
 
@@ -51,6 +51,8 @@ The verification record is dated **2026-09-29**. These figures describe earlier 
 | Frontend | 44 tests passed |
 | Browser workflows | 13 scenarios passed against real local services |
 | Production frontend builds | All five passed |
+
+A local re-run on **2026-10-04**, after review fixes, recorded 138 backend tests (949 assertions) and 50 frontend tests passing, with ESLint and Brakeman in CI; browser workflows and container builds were left to CI.
 
 Additional checks cover production eager loading, restricted-role migrations, Compose configuration, process handling, and backup restore. [VERIFICATION.md](VERIFICATION.md) records evidence boundaries; [AUDIT.md](AUDIT.md) and [AUDIT_SECOND_PASS.md](AUDIT_SECOND_PASS.md) describe corrected defects.
 
