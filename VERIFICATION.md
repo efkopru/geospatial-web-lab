@@ -132,6 +132,10 @@ The first PR #11 Brakeman scan flagged the batched segment-distance query becaus
 
 The affected fleet domain suite passed locally with 20 tests and 101 assertions, with no failures, errors, or skips. Added regressions cover an empty batch making no query, distances retaining input order, and SQL-like coordinates being rejected as numeric data. The existing query-count and known-speed regression also passed. Full-PR checks are recorded on [PR #11](https://github.com/efkopru/geospatial-web-lab/pull/11).
 
+### Merged state (October 5, 2026)
+
+On `main` at 146f111, after PRs #10 and #11 merged, 145 backend tests with 972 assertions passed locally (service requests 31/233, data quality 28/193, fleet 30/167, parcels 25/156, inspections 31/223). Root Vitest passed 50 tests across 11 suites, and `npm run lint` reported no problems. The lint and scan, full-stack (including the Playwright scenarios), standalone, and container workflows all passed on that commit.
+
 ## Boundaries
 
 Docker Desktop's engine failed to start in the original audit environment, so container image builds and runtime execution were **not verified** locally. They were later verified on GitHub Actions; see [Container verification](#container-verification-october-1-2026). The same applications were run and tested directly in WSL. At the time of this local audit, the workspace had not yet been published and remote CI had not run. Subsequent CI results are recorded in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions). No public application hosting was created then. The standalone browser editions were later published as a static demo; see the [standalone verification record](standalone/VERIFICATION.md#public-deployment-october-1-2026). The full-stack applications remain unhosted.
