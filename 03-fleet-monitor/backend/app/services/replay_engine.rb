@@ -34,18 +34,17 @@ class ReplayEngine
     replay.with_lock do
       return false unless replay.running? && replay.generation == generation && replay.cursor == expected_cursor
 
+      # Routes do not change during a replay; TelemetryRecorder re-reads each vehicle under its lock.
+      vehicles = Vehicle.order(:id).select { |vehicle| vehicle.route.length >= 2 }
       replay.speed.times do
         next_sequence = replay.sequence + 1
-        Vehicle.order(:id).each do |vehicle|
+        moves = vehicles.map do |vehicle|
           route = vehicle.route
-          next if route.length < 2
           index = (replay.cursor + vehicle.route_offset) % route.length
-          point = route[index]
-          previous = route[(index - 1) % route.length]
-          distance_m = Vehicle.connection.select_value(Vehicle.sanitize_sql_array([
-            "SELECT ST_Distance(ST_SetSRID(ST_MakePoint(?,?),4326)::geography,ST_SetSRID(ST_MakePoint(?,?),4326)::geography)",
-            previous[0], previous[1], point[0], point[1]
-          ])).to_f
+          [vehicle, route[(index - 1) % route.length], route[index]]
+        end
+        distances = segment_lengths(moves.map { |_, previous, point| [previous, point] })
+        moves.zip(distances) do |(vehicle, _, point), distance_m|
           TelemetryRecorder.record!(vehicle: vehicle, sequence: next_sequence, longitude: point[0], latitude: point[1],
             speed_kph: [distance_m / FRAME_SECONDS * 3.6, 250].min, captured_at: Time.current)
         end
@@ -56,6 +55,18 @@ class ReplayEngine
     end
     broadcast! if continue_replay
     continue_replay
+  end
+
+  # Geodesic lengths in metres of [[from, to], ...] longitude/latitude segments, in one query.
+  def self.segment_lengths(segments)
+    return [] if segments.empty?
+    rows = segments.each_with_index.map do |(from, to), index|
+      Vehicle.sanitize_sql_array(["(?, ?::float8, ?::float8, ?::float8, ?::float8)", index, from[0], from[1], to[0], to[1]])
+    end
+    Vehicle.connection.select_values(<<~SQL).map(&:to_f)
+      SELECT ST_Distance(ST_SetSRID(ST_MakePoint(x1, y1), 4326)::geography, ST_SetSRID(ST_MakePoint(x2, y2), 4326)::geography)
+      FROM (VALUES #{rows.join(", ")}) AS segment(n, x1, y1, x2, y2) ORDER BY n
+    SQL
   end
 
   def self.broadcast!
