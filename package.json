@@ -16,7 +16,7 @@
     "dev:3": "npm run dev --workspace @geo/fleet-monitor",
     "dev:4": "npm run dev --workspace @geo/parcel-scenarios",
     "dev:5": "npm run dev --workspace @geo/infrastructure-inspections",
-    "lint": "eslint ."
+    "lint": "eslint . --max-warnings 0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
