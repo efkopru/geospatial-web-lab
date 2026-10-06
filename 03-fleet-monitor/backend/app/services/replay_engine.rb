@@ -61,11 +61,12 @@ class ReplayEngine
   def self.segment_lengths(segments)
     return [] if segments.empty?
     rows = segments.each_with_index.map do |(from, to), index|
-      Vehicle.sanitize_sql_array(["(?, ?::float8, ?::float8, ?::float8, ?::float8)", index, from[0], from[1], to[0], to[1]])
+      { n: index, x1: from[0], y1: from[1], x2: to[0], y2: to[1] }
     end
-    Vehicle.connection.select_values(<<~SQL).map(&:to_f)
+    bind = ActiveRecord::Relation::QueryAttribute.new("segments", rows.to_json, ActiveRecord::Type::String.new)
+    Vehicle.connection.select_values(<<~SQL, "Replay segment lengths", [bind]).map(&:to_f)
       SELECT ST_Distance(ST_SetSRID(ST_MakePoint(x1, y1), 4326)::geography, ST_SetSRID(ST_MakePoint(x2, y2), 4326)::geography)
-      FROM (VALUES #{rows.join(", ")}) AS segment(n, x1, y1, x2, y2) ORDER BY n
+      FROM jsonb_to_recordset($1::jsonb) AS segment(n integer, x1 float8, y1 float8, x2 float8, y2 float8) ORDER BY n
     SQL
   end
 
