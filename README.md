@@ -51,7 +51,7 @@ Each application is an independent stack. The UI reads authoritative records fro
 | Rails, JavaScript, and React | Authenticated forms, JSON APIs, server validation, and account-specific workflows |
 | Interactive UI and visualization | Linked maps/tables, charts, live updates, playback, comparisons, and 3D controls |
 | ArcGIS, CesiumJS, and PostGIS | Spatial validation, distance/area queries, geofences, 2D feature interaction, and 3D assets |
-| Backend and job processing | Spatial indexes, batched spatial queries, bounded results/history, visible job states, explicit retries, deduplication, and concurrency guards |
+| Backend and job processing | Spatial indexes, batched spatial queries, bounded results/history, visible job states, bounded automatic retries, manual recovery, deduplication, and concurrency guards |
 | Integration and deployment preparation | Proxies, WebSockets, migrations, health checks, runtime scripts, and container configuration |
 | Automated reliability | Domain, permissions, browser workflows, persistence, and process lifecycle regressions |
 
@@ -169,9 +169,9 @@ Writing the dump inside the container and copying it preserves binary bytes on e
 ## Where to learn
 
 - React state and API integration: each `frontend/src/App.jsx`; shared `api` handles cookies, CSRF and errors.
-- Spatial backend design: each `backend/db/migrate/002_create_domain.rb`, model/service SQL, and GiST indexes. The fleet replay (`replay_engine.rb`, `telemetry_recorder.rb`) batches its distance and geofence queries, so a frame's query count does not grow with the number of geofences.
+- Spatial backend design: each `backend/db/migrate/002_create_domain.rb`, model/service SQL, and GiST indexes. The fleet replay (`replay_engine.rb`, `telemetry_recorder.rb`) batches its distance and geofence reads. Adding geofences does not add spatial-read queries per frame, but new memberships and transitions require individual writes.
 - Real-time delivery: `backend/app/channels`, model/service broadcasts, and shared `useLive`. Reconnect triggers a fresh authoritative fetch; polling provides recovery.
-- Background processing: `backend/app/jobs`, Sidekiq workers, visible processing states, retry/idempotence guards. Failed imports, exports, validations, and scenarios wait for an explicit retry in the app; Sidekiq does not reprocess them.
+- Background processing: `backend/app/jobs`, Sidekiq workers, visible processing states, retry/idempotence guards. Active Job allows up to three attempts for imports and exports, and retries database-connection failures during validation. Failed imports, validations, and scenarios can be retried in the app; failed exports are regenerated. These jobs disable Sidekiq's additional automatic retries.
 - Deployment: project Compose files, backend Dockerfiles, `scripts/Frontend.Dockerfile`, nginx proxy, and CI workflow.
 - Reliability: backend domain tests, `tests/*.test.jsx`, and `tests/browser` workflows.
 
