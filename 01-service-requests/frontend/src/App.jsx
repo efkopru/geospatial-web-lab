@@ -49,22 +49,21 @@ function CreateRequest({ onClose, onCreated }) {
   </Modal>;
 }
 
+const draftFor = (issue) => issue ? { status: issue.status, assigned_to_id: issue.assigned_to?.id || '', lock_version: issue.lock_version } : null;
+
+// The workspace keys this panel by request id, so each selected request starts a new draft.
 function RequestDetail({ issue, staff, isStaff, onSaved }) {
-  const [draft, setDraft] = useState(null);
+  const [draft, setDraft] = useState(() => draftFor(issue));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    setDraft(issue ? { status: issue.status, assigned_to_id: issue.assigned_to?.id || '', lock_version: issue.lock_version } : null);
-    setError('');
-  }, [issue?.id]);
   if (!issue) return <aside className="panel sr-detail"><div className="empty"><h2>Select a request</h2><p>Choose a marker or table row to inspect its details.</p></div></aside>;
   const stale = draft && draft.lock_version !== issue.lock_version;
-  const reset = () => { setDraft({ status: issue.status, assigned_to_id: issue.assigned_to?.id || '', lock_version: issue.lock_version }); setError(''); };
+  const reset = () => { setDraft(draftFor(issue)); setError(''); };
   const save = async (event) => {
     event.preventDefault(); setError(''); setBusy(true);
     try {
       const result = await api(`/api/issues/${issue.id}`, { method: 'PATCH', body: { issue: draft } });
-      setDraft({ status: result.issue.status, assigned_to_id: result.issue.assigned_to?.id || '', lock_version: result.issue.lock_version });
+      setDraft(draftFor(result.issue));
       onSaved(result.issue);
     } catch (err) { setError(message(err)); onSaved(); } finally { setBusy(false); }
   };

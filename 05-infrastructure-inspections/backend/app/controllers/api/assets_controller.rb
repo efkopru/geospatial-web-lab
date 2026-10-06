@@ -8,7 +8,7 @@ module Api
 
     def show
       asset = InfrastructureAsset.includes(:inspections).find(params[:id])
-      render json: { asset: asset.payload, inspections: asset.inspections.includes(:author, :resolved_by).order(created_at: :desc).map(&:payload) }
+      render json: { asset: asset.payload, inspections: asset.inspections.includes(:author, :resolved_by, inspection_events: :actor).order(created_at: :desc).map(&:payload) }
     end
   end
 end

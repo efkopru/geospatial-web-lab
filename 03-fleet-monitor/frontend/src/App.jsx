@@ -30,6 +30,7 @@ function Workspace({ session }) {
 
   useEffect(() => {
     mounted.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bumping the counters on unmount invalidates requests still in flight
     return () => { mounted.current = false; stateRequest.current++; historyRequest.current++; };
   }, []);
 

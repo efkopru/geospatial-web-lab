@@ -216,7 +216,27 @@ class InfrastructurePermissionsTest < ActionDispatch::IntegrationTest
     ProfileJob.skip_callback(:enqueue, :before, reject, raise: false)
   end
 
+  test "an asset's detail loads in the same number of queries however many inspections it has" do
+    login(@reporter)
+    add_inspection = -> { @asset.inspections.create!(author: @reporter, severity: "low", notes: "Synthetic paint is flaking.", observed_at: Time.current) }
+    add_inspection.call
+    with_one = statements { get "/api/assets/#{@asset.id}" }
+    3.times { add_inspection.call }
+    with_four = statements { get "/api/assets/#{@asset.id}" }
+    assert_equal with_one, with_four
+    assert_equal 4, response.parsed_body["inspections"].length
+    assert_equal ["reported"], response.parsed_body["inspections"].first["events"].map { |event| event["action"] }
+    assert_equal "Inspector", response.parsed_body["inspections"].first["events"].first["actor_name"]
+  end
+
   private
+
+  def statements
+    count = 0
+    counter = ->(*, payload) { count += 1 unless %w[SCHEMA TRANSACTION].include?(payload[:name]) }
+    ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { yield }
+    count
+  end
 
   def login(user)
     post "/api/session", params: { email: user.email, password: "Learning123!" }, as: :json
