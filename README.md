@@ -51,7 +51,7 @@ Each application is an independent stack. The UI reads authoritative records fro
 | Rails, JavaScript, and React | Authenticated forms, JSON APIs, server validation, and account-specific workflows |
 | Interactive UI and visualization | Linked maps/tables, charts, live updates, playback, comparisons, and 3D controls |
 | ArcGIS, CesiumJS, and PostGIS | Spatial validation, distance/area queries, geofences, 2D feature interaction, and 3D assets |
-| Backend and job processing | Spatial indexes, bounded results/history, visible job states, retries, deduplication, and concurrency guards |
+| Backend and job processing | Spatial indexes, batched spatial queries, bounded results/history, visible job states, explicit retries, deduplication, and concurrency guards |
 | Integration and deployment preparation | Proxies, WebSockets, migrations, health checks, runtime scripts, and container configuration |
 | Automated reliability | Domain, permissions, browser workflows, persistence, and process lifecycle regressions |
 
@@ -102,7 +102,7 @@ The application processes use the `geolab` database role with password `geolab`.
 
 ## Set up another Linux/WSL environment
 
-Install Ruby 3.2+ (3.4 for the supplied container), Bundler, PostgreSQL with matching PostGIS packages, Redis, Node 24, and native build prerequisites (`build-essential`, `libpq-dev`, `libyaml-dev`). Run `bundle install` in each backend. Run bootstrap as root on Ubuntu, or provision the databases and extensions with your database administrator. Adjust the `/mnt/c/...` path when using a different checkout.
+Install Ruby 3.2+ (CI and the supplied container use 3.4; Ruby 3.2 reached end of life on 2026-03-31), Bundler, PostgreSQL with matching PostGIS packages, Redis, Node 24, and native build prerequisites (`build-essential`, `libpq-dev`, `libyaml-dev`). Run `bundle install` in each backend. Run bootstrap as root on Ubuntu, or provision the databases and extensions with your database administrator. Adjust the `/mnt/c/...` path when using a different checkout.
 
 Application database names are `service_requests`, `data_quality_portal`, `fleet_monitor`, `parcel_scenarios`, and `infrastructure_inspections`; test databases add `_test`. Override `DATABASE_URL`, `TEST_DATABASE_URL`, and `REDIS_URL` to use other services.
 
@@ -131,7 +131,7 @@ For an external deployment, provision HTTPS, set `ALLOWED_HOSTS` and `ALLOWED_OR
 
 ## Verification
 
-The application audit dated **2026-09-29** recorded 109 backend tests with 690 assertions, 44 frontend tests across 10 suites, 13 Playwright scenarios against real services, and five successful frontend builds. All five Compose configurations parsed successfully. These are recorded results, not new test runs performed while authoring the documentation. A local re-run on **2026-10-04** recorded 138 backend tests with 949 assertions and 50 frontend tests across 11 suites, with ESLint and Brakeman reporting no errors or warnings that fail the build; see [VERIFICATION.md](VERIFICATION.md#review-fixes-october-4-2026).
+The application audit dated **2026-09-29** recorded 109 backend tests with 690 assertions, 44 frontend tests across 10 suites, 13 Playwright scenarios against real services, and five successful frontend builds. All five Compose configurations parsed successfully. These are recorded results, not new test runs performed while authoring the documentation. After the October 2026 review fixes, a local run of `main` at 146f111 on **2026-10-05** recorded 145 backend tests with 972 assertions and 50 frontend tests across 11 suites; ESLint reported no errors or warnings and Brakeman no warnings. The lint, full-stack (including the Playwright scenarios), standalone, and container workflows passed on the same commit; see [VERIFICATION.md](VERIFICATION.md#review-follow-ups-october-5-2026).
 
 ```powershell
 npm test
@@ -146,11 +146,13 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
+The lint workflow also runs Brakeman, which is not in the Gemfiles. To run it locally, install `brakeman` 8.1.0 and run `brakeman --no-pager --except EOLRuby <project>/backend` for each backend. The end-of-life Ruby check is excluded because the lockfiles record the local Ruby 3.2.3.
+
 Backend suites exercise PostGIS operations, validation, ownership and staff permissions, state transitions, replay generation guards, job deduplication, immutable dataset versions, stale writes, and calculated outcomes. React tests verify user interactions and the shared request/CSRF contract. Browser tests use real APIs and workers. Read [VERIFICATION.md](VERIFICATION.md) for observed results and remaining environmental limitations.
 
 Tests explicitly migrate their test databases. Rails automatic test schema replacement is disabled because a restricted app role must not drop/recreate the administrator-owned PostGIS extension. `db/structure.sql` captures native spatial/generated columns and database constraints.
 
-Browser tests add synthetic records to development databases. Docker image builds and container runtime could not be verified locally because the engine could not start. The [container workflow](.github/workflows/containers.yml) builds and smoke-tests each stack on GitHub Actions; all five passed on October 1, 2026 (see [VERIFICATION.md](VERIFICATION.md#container-verification-october-1-2026)). The [GitHub workflow](.github/workflows/ci.yml) repeats validation on pull requests and `main`; its run status is separate from the dated local results above. The [lint workflow](.github/workflows/lint.yml) runs ESLint, Brakeman, and a check that intentionally copied files are still identical on every change. The full-stack applications have no public deployment; only the standalone browser editions are published (see [standalone/README.md](standalone/README.md#publishing-a-static-demo)). Successful builds and Compose parsing do not establish deployment readiness.
+Browser tests add synthetic records to development databases. Docker image builds and container runtime could not be verified locally because the engine could not start. The [container workflow](.github/workflows/containers.yml) builds and smoke-tests each stack on GitHub Actions; all five passed on October 1, 2026 (see [VERIFICATION.md](VERIFICATION.md#container-verification-october-1-2026)) and again on `main` at 146f111 on October 5, 2026. The [GitHub workflow](.github/workflows/ci.yml) repeats validation on pull requests and `main`; its run status is separate from the dated local results above. The [lint workflow](.github/workflows/lint.yml) runs ESLint, Brakeman, and a check that intentionally copied files are still identical on every change. The full-stack applications have no public deployment; only the standalone browser editions are published (see [standalone/README.md](standalone/README.md#publishing-a-static-demo)). Successful builds and Compose parsing do not establish deployment readiness.
 
 ## Backup and restore
 
@@ -167,9 +169,9 @@ Writing the dump inside the container and copying it preserves binary bytes on e
 ## Where to learn
 
 - React state and API integration: each `frontend/src/App.jsx`; shared `api` handles cookies, CSRF and errors.
-- Spatial backend design: each `backend/db/migrate/002_create_domain.rb`, model/service SQL, and GiST indexes.
+- Spatial backend design: each `backend/db/migrate/002_create_domain.rb`, model/service SQL, and GiST indexes. The fleet replay (`replay_engine.rb`, `telemetry_recorder.rb`) batches its distance and geofence queries, so a frame's query count does not grow with the number of geofences.
 - Real-time delivery: `backend/app/channels`, model/service broadcasts, and shared `useLive`. Reconnect triggers a fresh authoritative fetch; polling provides recovery.
-- Background processing: `backend/app/jobs`, Sidekiq workers, visible processing states, retry/idempotence guards.
+- Background processing: `backend/app/jobs`, Sidekiq workers, visible processing states, retry/idempotence guards. Failed imports, exports, validations, and scenarios wait for an explicit retry in the app; Sidekiq does not reprocess them.
 - Deployment: project Compose files, backend Dockerfiles, `scripts/Frontend.Dockerfile`, nginx proxy, and CI workflow.
 - Reliability: backend domain tests, `tests/*.test.jsx`, and `tests/browser` workflows.
 
