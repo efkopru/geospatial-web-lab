@@ -38,7 +38,7 @@ The map/register displays at most the latest 500 matching requests. Summary coun
 - Staff edits require `lock_version`. Stale writes return HTTP 409, and the UI requires current values to be reviewed before another save.
 - Import requests accept a GeoJSON FeatureCollection with 1 to 500 Point features and a payload smaller than 2 MB. Properties require `title`; `category` defaults to `roads`; `description` is optional.
 - A per-user SHA-256 digest reuses identical imports. Each feature has a unique stable source key. PostgreSQL advisory locks serialize executions of the same import, and retrying after partial work does not duplicate issues.
-- Validation errors reject individual rows while valid rows continue. Unexpected failures mark the run failed; the background job retries up to three times, and the interface also exposes retry for failed runs. Corrected validation errors require a new upload.
+- Validation errors reject individual rows while valid rows continue. Unexpected failures mark the run failed; Active Job makes up to three attempts in total (Sidekiq's own retries are disabled), and the interface exposes **Retry import** for a run that stays failed. Corrected validation errors require a new upload.
 - CSV exports run as jobs, store downloadable output in the database, and neutralize spreadsheet formula prefixes in free text. Only the staff member who requested a report can download it.
 - Background report storage is appropriate for this bounded demo. Large production exports would use object storage, retention policies, and snapshot semantics.
 
