@@ -2,7 +2,7 @@ module Api
  class ScenariosController < ApplicationController
   before_action :require_user!
   def index
-   render json: current_user_scenarios.order(created_at: :desc)
+   render json: current_user_scenarios.listed
   end
   def show
    render json: current_user_scenarios.find(params[:id])

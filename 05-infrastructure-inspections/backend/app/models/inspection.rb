@@ -12,9 +12,11 @@ class Inspection < ApplicationRecord
   after_create :record_creation
 
   def payload
+    # The asset detail preloads every inspection's events; a single inspection loads its own.
+    events = inspection_events.loaded? ? inspection_events.sort_by(&:id) : inspection_events.order(:id).includes(:actor)
     as_json(only: %i[id infrastructure_asset_id severity status notes resolution_notes observed_at resolved_at lock_version created_at]).merge(
       "author_name" => author.name, "resolved_by_name" => resolved_by&.name,
-      "events" => inspection_events.order(:id).includes(:actor).map { |event| event.as_json(only: %i[id action notes created_at]).merge("actor_name" => event.actor.name) }
+      "events" => events.map { |event| event.as_json(only: %i[id action notes created_at]).merge("actor_name" => event.actor.name) }
     )
   end
 

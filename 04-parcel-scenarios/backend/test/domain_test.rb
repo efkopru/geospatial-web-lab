@@ -54,6 +54,21 @@ class ScenarioApiTest < ActionDispatch::IntegrationTest
   get "/api/scenarios/#{s.id}";assert_response :not_found
   get '/api/parcels',params:{bbox:'bad'};assert_response :unprocessable_entity
  end
+ test 'the scenario list returns the latest 100 without parcel snapshots' do
+  user=User.create!(email:'list@test.local',name:'Lister',password:'Learning123!',role:'staff')
+  parcel=Parcel.create!(name:'List block',district:'Test',boundary:{type:'Polygon',coordinates:[[[0,0],[0.01,0],[0.01,0.01],[0,0.01],[0,0]]]})
+  scenarios=(Scenario::LIST_LIMIT+1).times.map { |i| Scenario.create!(user:user,name:"Scenario #{i}",parcel_ids:[parcel.id],floors:2,coverage:0.5,unit_area:900,created_at:i.minutes.ago) }
+  scenarios.first.update_columns(status:'complete',results:{'units'=>12,'parcel_snapshot'=>[{'id'=>parcel.id,'boundary'=>parcel.boundary}]})
+  post '/api/session',params:{email:user.email,password:'Learning123!'},as: :json
+  get '/api/scenarios'
+  assert_response :success
+  assert_equal scenarios.first(Scenario::LIST_LIMIT).map(&:id),response.parsed_body.map { |s| s['id'] }
+  assert_equal({'units'=>12},response.parsed_body.first['results'])
+  get "/api/scenarios/#{scenarios.first.id}"
+  assert_equal parcel.id,response.parsed_body.dig('results','parcel_snapshot',0,'id')
+  get "/api/scenarios/#{scenarios.first.id}/export"
+  assert_equal parcel.id,JSON.parse(response.body).dig('results','parcel_snapshot',0,'id')
+ end
  test 'a failed calculation is retried from the app, not by Sidekiq' do
   assert_equal false,CalculateScenarioJob.get_sidekiq_options['retry']
  end

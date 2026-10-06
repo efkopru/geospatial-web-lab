@@ -6,10 +6,12 @@ export default function CorridorViewer({ assets, selectedId, onSelect, exaggerat
   const container = useRef(null);
   const viewerRef = useRef(null);
   const selectRef = useRef(onSelect);
+  const scene = useRef({ assets, selectedId, exaggeration });
   const initialView = useRef(false);
   const [error, setError] = useState('');
   const [compact, setCompact] = useState(false);
   selectRef.current = onSelect;
+  scene.current = { assets, selectedId, exaggeration };
 
   useEffect(() => {
     let viewer;
@@ -85,8 +87,10 @@ export default function CorridorViewer({ assets, selectedId, onSelect, exaggerat
     viewer.scene.requestRender();
   }, [assets, selectedId, exaggeration, showLabels, compact]);
 
+  // The camera moves only when a new focus request arrives, using the scene as it is then.
   useEffect(() => {
     const viewer = viewerRef.current;
+    const { assets, selectedId, exaggeration } = scene.current;
     if (!viewer || !assets.length || !focusRequest) return;
     if (focusRequest.mode === 'all') {
       const center = Cartesian3.fromDegrees(assets.reduce((sum, asset) => sum + asset.longitude, 0) / assets.length, assets.reduce((sum, asset) => sum + asset.latitude, 0) / assets.length, Math.min(...assets.map((asset) => asset.ground_elevation_m)) + 30);

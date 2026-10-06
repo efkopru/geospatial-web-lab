@@ -80,6 +80,7 @@ export function useSession(){
   window.addEventListener('focus',focus);
   document.addEventListener('visibilitychange',visible);
   refresh();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- bumping the version on unmount invalidates lookups still in flight
   return ()=>{active=false;version.current++;refreshSession.current=null;channel.current?.close();channel.current=null;window.removeEventListener(sessionEvent,receive);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',visible);};
  },[]);
  const finishChange=()=>{changing.current=false;if(pendingRefresh.current){pendingRefresh.current=false;refreshSession.current?.();}};
