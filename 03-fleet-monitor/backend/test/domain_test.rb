@@ -160,6 +160,26 @@ class FleetDomainTest < ActiveSupport::TestCase
     assert_equal 250, @vehicle.reload.speed_kph, "2.2 degrees in one frame is capped at 250 km/h"
   end
 
+  test "empty segment batches do not query the database" do
+    assert_equal 0, statements { assert_empty ReplayEngine.segment_lengths([]) }
+  end
+
+  test "batched segment lengths retain input order" do
+    lengths = ReplayEngine.segment_lengths([[[0, 0], [0.002, 0]], [[0, 0], [0.001, 0]]])
+    assert_equal 2, lengths.length
+    assert_in_delta 222.64, lengths[0], 0.05
+    assert_in_delta 111.32, lengths[1], 0.05
+  end
+
+  test "SQL syntax in segment coordinates is rejected as numeric data" do
+    assert_raises(ActiveRecord::StatementInvalid) do
+      Vehicle.transaction(requires_new: true) do
+        ReplayEngine.segment_lengths([[["0); DROP TABLE vehicles; --", 0], [0.001, 0]]])
+      end
+    end
+    assert Vehicle.exists?(@vehicle.id)
+  end
+
   private
 
   def record(sequence, longitude)

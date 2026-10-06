@@ -126,6 +126,12 @@ Checked locally on the review-fixes branch in the same WSL runtime.
 - ESLint reports no errors or warnings and now fails on any warning. Root Vitest 50/50, standalone 70 domain and storage tests and 10 interface tests, copied-file check 28/28, all five Vite builds, and the standalone `verify:browser` check passed. The service-request draft reset, map rendering and 3D focus were checked by hand in the built standalone site.
 - Compose was left unchanged: the container workflow log shows BuildKit building the backend image once and only exporting the migrate, API and worker tags in parallel (about 1.2 s).
 
+### Follow-up scan correction (October 5, 2026)
+
+The first PR #11 Brakeman scan flagged the batched segment-distance query because it interpolated a joined set of individually quoted SQL values. The query now uses static SQL and one bound JSON parameter with `jsonb_to_recordset`, typed coordinate fields, and explicit input-order sorting. The batching remains one distance query per frame; no scanner rule was suppressed.
+
+The affected fleet domain suite passed locally with 20 tests and 101 assertions, with no failures, errors, or skips. Added regressions cover an empty batch making no query, distances retaining input order, and SQL-like coordinates being rejected as numeric data. The existing query-count and known-speed regression also passed. Full-PR checks are recorded on [PR #11](https://github.com/efkopru/geospatial-web-lab/pull/11).
+
 ## Boundaries
 
 Docker Desktop's engine failed to start in the original audit environment, so container image builds and runtime execution were **not verified** locally. They were later verified on GitHub Actions; see [Container verification](#container-verification-october-1-2026). The same applications were run and tested directly in WSL. At the time of this local audit, the workspace had not yet been published and remote CI had not run. Subsequent CI results are recorded in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions). No public application hosting was created then. The standalone browser editions were later published as a static demo; see the [standalone verification record](standalone/VERIFICATION.md#public-deployment-october-1-2026). The full-stack applications remain unhosted.
