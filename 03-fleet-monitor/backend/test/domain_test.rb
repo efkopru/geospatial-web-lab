@@ -137,10 +137,40 @@ class FleetDomainTest < ActiveSupport::TestCase
     ActionCable.server.define_singleton_method(:broadcast, original)
   end
 
+  test "recording a position takes the same number of statements however many geofences exist" do
+    record(1, 5)
+    with_one = statements { record(2, 5) }
+    3.times { |i| Geofence.create!(name: "Extra #{i}", coordinates: [[10 + i, 10], [11 + i, 10], [11 + i, 11], [10 + i, 11], [10 + i, 10]]) }
+    record(3, 5)
+    with_four = statements { record(4, 5) }
+    assert_equal with_one, with_four
+    assert_equal 4, GeofenceMembership.where(vehicle: @vehicle, inside: false).count
+  end
+
+  test "a replay frame measures every vehicle's segment in one query" do
+    second = Vehicle.create!(name: "Second unit", registration: "TEST-002", color: "#f97316", route: [[0, 0], [0.001, 0]])
+    replay = ReplayEngine.control!("start")
+    distance_queries = 0
+    counter = ->(*, payload) { distance_queries += 1 if payload[:sql].include?("ST_Distance") }
+    ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { ReplayEngine.advance!(replay.generation, 0) }
+    assert_equal 1, distance_queries
+    # The first frame moves from the last route point to the first. For the second unit that is
+    # 0.001 degrees of longitude at the equator, 111.3 m in a 10-second frame.
+    assert_in_delta 111.32 / 10 * 3.6, second.reload.speed_kph, 0.05
+    assert_equal 250, @vehicle.reload.speed_kph, "2.2 degrees in one frame is capped at 250 km/h"
+  end
+
   private
 
   def record(sequence, longitude)
     TelemetryRecorder.record!(vehicle: @vehicle, sequence: sequence, longitude: longitude, latitude: 0)
+  end
+
+  def statements
+    count = 0
+    counter = ->(*, payload) { count += 1 unless %w[SCHEMA TRANSACTION].include?(payload[:name]) }
+    ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { yield }
+    count
   end
 end
 

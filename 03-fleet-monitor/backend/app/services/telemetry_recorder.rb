@@ -19,23 +19,31 @@ class TelemetryRecorder
         "INSERT INTO telemetry_points (vehicle_id,sequence,longitude,latitude,speed_kph,captured_at,geom) VALUES (?,?,?,?,?,?,ST_SetSRID(ST_MakePoint(?,?),4326))",
         vehicle.id, sequence, longitude, latitude, speed_kph, captured_at, longitude, latitude
       ]))
-      Geofence.order(:id).each do |fence|
-        inside = Geofence.connection.select_value(Geofence.sanitize_sql_array([
-          "SELECT ST_Covers(geom,ST_SetSRID(ST_MakePoint(?,?),4326)) FROM geofences WHERE id = ?", longitude, latitude, fence.id
-        ]))
-        membership = GeofenceMembership.find_or_initialize_by(vehicle: vehicle, geofence: fence)
-        previous = membership.inside || false
-        if inside != previous
-          GeofenceEvent.create!(vehicle: vehicle, geofence: fence, sequence: sequence, transition: inside ? "entered" : "exited", captured_at: captured_at)
-        end
-        membership.update!(inside: inside)
-      end
-      old_ids = vehicle.telemetry_points.order(sequence: :desc).offset(HISTORY_LIMIT).pluck(:id)
-      TelemetryPoint.where(id: old_ids).delete_all if old_ids.any?
-      stale_events = GeofenceEvent.order(id: :desc).offset(EVENT_LIMIT).pluck(:id)
-      GeofenceEvent.where(id: stale_events).delete_all if stale_events.any?
+      transitions = record_memberships(vehicle, sequence, longitude, latitude, captured_at)
+      # Each limit is enforced with a single DELETE. The event log only grows on a transition.
+      TelemetryPoint.where(vehicle_id: vehicle.id, id: TelemetryPoint.where(vehicle_id: vehicle.id).order(sequence: :desc).offset(HISTORY_LIMIT).select(:id)).delete_all
+      GeofenceEvent.where(id: GeofenceEvent.order(id: :desc).offset(EVENT_LIMIT).select(:id)).delete_all if transitions.positive?
       accepted = true
     end
     accepted
   end
+
+  # Tests the position against every geofence in one query, records an event for each entry or
+  # exit, and writes only memberships that are new or changed. Returns the number of events.
+  def self.record_memberships(vehicle, sequence, longitude, latitude, captured_at)
+    covers = Geofence.sanitize_sql_array(["ST_Covers(geom,ST_SetSRID(ST_MakePoint(?,?),4326)) AS covers_position", longitude, latitude])
+    memberships = GeofenceMembership.where(vehicle_id: vehicle.id).index_by(&:geofence_id)
+    transitions = 0
+    Geofence.select(:id, covers).order(:id).each do |fence|
+      inside = fence.covers_position
+      membership = memberships[fence.id] || GeofenceMembership.new(vehicle: vehicle, geofence: fence)
+      if inside != (membership.inside || false)
+        GeofenceEvent.create!(vehicle: vehicle, geofence: fence, sequence: sequence, transition: inside ? "entered" : "exited", captured_at: captured_at)
+        transitions += 1
+      end
+      membership.update!(inside: inside)
+    end
+    transitions
+  end
+  private_class_method :record_memberships
 end
