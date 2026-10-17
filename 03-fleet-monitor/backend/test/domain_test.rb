@@ -137,6 +137,22 @@ class FleetDomainTest < ActiveSupport::TestCase
     ActionCable.server.define_singleton_method(:broadcast, original)
   end
 
+  test "a replay that runs out of sequence numbers stops and cannot restart until reset" do
+    replay = ReplayEngine.control!("start")
+    replay.update_columns(sequence: TelemetryRecorder::MAX_SEQUENCE - 1)
+    assert ReplayEngine.advance!(replay.generation, 0)
+    assert_equal TelemetryRecorder::MAX_SEQUENCE, @vehicle.reload.last_sequence
+    assert_not ReplayEngine.advance!(replay.generation, 1)
+    stopped = ReplayControl.instance
+    assert_not stopped.running?
+    assert_equal [1, TelemetryRecorder::MAX_SEQUENCE], [stopped.cursor, stopped.sequence]
+    error = assert_raises(ArgumentError) { ReplayEngine.control!("start") }
+    assert_equal "The replay cannot advance: its next frame would exceed sequence #{TelemetryRecorder::MAX_SEQUENCE}. Reset the replay to continue.", error.message
+    assert_not ReplayControl.instance.running?
+    ReplayEngine.control!("reset")
+    assert ReplayEngine.control!("start").running?
+  end
+
   test "recording a position takes the same number of statements however many geofences exist" do
     record(1, 5)
     with_one = statements { record(2, 5) }
@@ -246,6 +262,37 @@ class FleetPermissionsTest < ActionDispatch::IntegrationTest
     get "/api/vehicles/#{vehicle.id}/history"
     assert_response :success
     assert_equal 1, response.parsed_body["points"].length
+  end
+
+  test "manual telemetry leaves the replay room to advance and rejects larger sequences without changes" do
+    vehicle = Vehicle.create!(name: "Boundary unit", registration: "BOUNDARY-1", color: "#06b6d4", route: [[0, 0], [0.001, 0]])
+    post "/api/session", params: { email: @staff.email, password: "Learning123!" }, as: :json
+    [TelemetryRecorder::MAX_MANUAL_SEQUENCE + 1, TelemetryRecorder::MAX_SEQUENCE, 1_760_616_000_000].each do |sequence|
+      post "/api/vehicles/#{vehicle.id}/telemetry", params: { sequence: sequence, longitude: 0, latitude: 0 }, as: :json
+      assert_response :unprocessable_entity
+      assert_equal "Sequence must be an integer from 0 to #{TelemetryRecorder::MAX_MANUAL_SEQUENCE}", response.parsed_body["error"]
+    end
+    assert_equal [-1, 0, 0], [vehicle.reload.last_sequence, vehicle.telemetry_points.count, ReplayControl.instance.sequence]
+
+    post "/api/vehicles/#{vehicle.id}/telemetry", params: { sequence: TelemetryRecorder::MAX_MANUAL_SEQUENCE, longitude: 0, latitude: 0 }, as: :json
+    assert_response :success
+    assert_equal true, response.parsed_body["accepted"]
+    assert_equal TelemetryRecorder::MAX_MANUAL_SEQUENCE, ReplayControl.instance.sequence
+    post "/api/fleet/control", params: { action_name: "start" }, as: :json
+    assert_response :success
+    replay = ReplayControl.instance
+    assert ReplayEngine.advance!(replay.generation, replay.cursor)
+    assert_equal TelemetryRecorder::MAX_MANUAL_SEQUENCE + 1, vehicle.reload.last_sequence
+    assert_equal TelemetryRecorder::MAX_MANUAL_SEQUENCE + 1, ReplayControl.instance.sequence
+  end
+
+  test "starting a replay without sequence numbers left returns a validation error" do
+    ReplayControl.instance.update!(sequence: TelemetryRecorder::MAX_SEQUENCE)
+    post "/api/session", params: { email: @staff.email, password: "Learning123!" }, as: :json
+    post "/api/fleet/control", params: { action_name: "start" }, as: :json
+    assert_response :unprocessable_entity
+    assert_match "Reset the replay to continue", response.parsed_body["error"]
+    assert_not ReplayControl.instance.running?
   end
 
   test "a rejected replay enqueue returns a retryable response without starting replay" do

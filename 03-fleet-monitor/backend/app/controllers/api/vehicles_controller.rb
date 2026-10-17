@@ -21,7 +21,8 @@ module Api
         end
         vehicle = Vehicle.find(params[:id])
         accepted = TelemetryRecorder.record!(vehicle: vehicle, sequence: params.require(:sequence),
-          longitude: params.require(:longitude), latitude: params.require(:latitude), speed_kph: params[:speed_kph] || 0)
+          longitude: params.require(:longitude), latitude: params.require(:latitude), speed_kph: params[:speed_kph] || 0,
+          max_sequence: TelemetryRecorder::MAX_MANUAL_SEQUENCE)
         replay.update!(sequence: [replay.sequence, vehicle.reload.last_sequence].max) if accepted
       end
       ReplayEngine.broadcast! if accepted
