@@ -134,9 +134,11 @@ The affected fleet domain suite passed locally with 20 tests and 101 assertions,
 
 ### Merged state (October 5, 2026)
 
-On `main` at 146f111, after PRs #10 and #11 merged, 145 backend tests with 972 assertions passed locally (service requests 31/233, data quality 28/193, fleet 30/167, parcels 25/156, inspections 31/223). Root Vitest passed 50 tests across 11 suites, and `npm run lint` reported no problems. The lint and scan, full-stack (including the Playwright scenarios), standalone, and container workflows all passed on that commit.
+On `main` at f4eb28b, after PRs #10 and #11 merged, 145 backend tests with 972 assertions passed locally (service requests 31/233, data quality 28/193, fleet 30/167, parcels 25/156, inspections 31/223). Root Vitest passed 50 tests across 11 suites, and `npm run lint` reported no problems. The lint and scan, full-stack (including the Playwright scenarios), standalone, and container workflows all passed on that commit.
 
 ## Boundaries
+
+The repository history was rewritten in October 2026 to change the commit author email; file contents are unchanged. Commit hashes in these records refer to the rewritten history.
 
 Docker Desktop's engine failed to start in the original audit environment, so container image builds and runtime execution were **not verified** locally. They were later verified on GitHub Actions; see [Container verification](#container-verification-october-1-2026). The same applications were run and tested directly in WSL. At the time of this local audit, the workspace had not yet been published and remote CI had not run. Subsequent CI results are recorded in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions). No public application hosting was created then. The standalone browser editions were later published as a static demo; see the [standalone verification record](standalone/VERIFICATION.md#public-deployment-october-1-2026). The full-stack applications remain unhosted.
 
