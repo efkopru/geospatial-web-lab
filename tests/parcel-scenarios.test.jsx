@@ -109,3 +109,37 @@ it('retry queue failures remain visible and do not claim success', async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Queue remains unavailable.');
 });
+
+const completed = id => ({ ...scenario, id, name: `Concept ${id}` });
+const compareBox = id => screen.getByRole('checkbox', { name: `Compare Concept ${id}` });
+
+it('frees comparison slots held by scenarios deleted in another tab', async () => {
+  let list = [1, 2, 3, 4, 5].map(completed);
+  shared.api.mockImplementation(async path => path === '/api/parcels' ? { features: [parcel] } : list);
+  render(<App />);
+  await screen.findByText('Concept 5');
+  [1, 2, 3, 4].forEach(id => fireEvent.click(compareBox(id)));
+  expect(compareBox(5)).toBeDisabled();
+  list = [completed(5)];
+  await act(async () => { await shared.live(); });
+  expect(screen.queryByText('Concept 1')).not.toBeInTheDocument();
+  expect(compareBox(5)).toBeEnabled();
+  fireEvent.click(compareBox(5));
+  expect(compareBox(5)).toBeChecked();
+});
+
+it('keeps visible comparisons across an unrelated refresh and drops ones that leave the list', async () => {
+  let list = [1, 2, 3, 4, 5, 6].map(completed);
+  shared.api.mockImplementation(async path => path === '/api/parcels' ? { features: [parcel] } : list);
+  render(<App />);
+  await screen.findByText('Concept 6');
+  [1, 2, 3, 4].forEach(id => fireEvent.click(compareBox(id)));
+  await act(async () => { await shared.live(); });
+  [1, 2, 3, 4].forEach(id => expect(compareBox(id)).toBeChecked());
+  // Concept 1 rolls out of the newest-100 window; its slot becomes free.
+  list = [7, 2, 3, 4, 5, 6].map(completed);
+  await act(async () => { await shared.live(); });
+  [2, 3, 4].forEach(id => expect(compareBox(id)).toBeChecked());
+  expect(compareBox(5)).toBeEnabled();
+  expect(compareBox(7)).toBeEnabled();
+});

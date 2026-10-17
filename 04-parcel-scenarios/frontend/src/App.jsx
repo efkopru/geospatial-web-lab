@@ -15,6 +15,9 @@ function Workspace({session}){
    if(!mounted.current||request!==requestSequence.current)return;
    if(p){parcelsLoaded.current=true;setParcels(p.features);}
    setScenarios(s);
+   // Comparison slots belong only to completed scenarios still in the list; ones deleted elsewhere or
+   // past the newest 100 must not keep using them.
+   setCompare(current=>current.filter(id=>s.some(scenario=>scenario.id===id&&scenario.status==='complete')));
   }catch(e){if(mounted.current&&request===requestSequence.current)setError(e.message);}
  },[]);
  useEffect(()=>{mounted.current=true;refresh();return()=>{mounted.current=false;requestSequence.current+=1;};},[refresh]);const live=useLive('ScenarioChannel',refresh);usePolling(refresh,15000);
