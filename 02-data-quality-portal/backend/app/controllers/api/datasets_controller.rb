@@ -5,8 +5,17 @@ module Api
     before_action :require_staff!, only: :approve
     rescue_from ArgumentError, with: :render_bad_input
 
+    LIBRARY_LIMIT = 100
+
     def index
-      datasets = accessible.select_summary.includes(:user).order(created_at: :desc).limit(100).to_a
+      datasets = accessible.select_summary.includes(:user).order(created_at: :desc).limit(LIBRARY_LIMIT).to_a
+      # The library lists the newest datasets. The one the user has open (?selected=id) is listed
+      # too when it is older, so reopening an earlier upload keeps it selected.
+      selected_id = Integer(params[:selected], exception: false) if params[:selected].is_a?(String)
+      if selected_id && datasets.none? { |dataset| dataset.id == selected_id }
+        selected = accessible.select_summary.includes(:user).find_by(id: selected_id)
+        datasets << selected if selected
+      end
       versions = Dataset.version_summaries(datasets.map(&:id))
       render json: { datasets: datasets.map { |dataset| dataset.summary(version: versions[dataset.id]) } }
     end

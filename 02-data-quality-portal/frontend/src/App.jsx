@@ -63,7 +63,11 @@ function Workspace({ session }) {
     const userId = session.user.id;
     const listSequence = ++listRequest.current;
     try {
-      const result = await api('/datasets');
+      // The library holds the newest 100 datasets; the open one is requested as well so that an older
+      // dataset, for example one reopened by uploading it again, stays selected. The ref holds the
+      // selection made since this callback was created.
+      const open = activeSelection.current;
+      const result = await api(open ? `/datasets?selected=${open}` : '/datasets');
       if (activeUser.current !== userId || listSequence !== listRequest.current) return;
       setDatasets(result.datasets);
       setSelectedId(current => result.datasets.some(dataset => dataset.id === current) ? current : result.datasets[0]?.id ?? null);
