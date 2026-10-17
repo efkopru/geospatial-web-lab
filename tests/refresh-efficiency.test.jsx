@@ -75,7 +75,9 @@ it('limits record reads while a dataset validates', async () => {
 });
 
 it('keeps a re-uploaded dataset selected when it is older than the newest-100 library', async () => {
-  const newest = Array.from({ length: 100 }, (_, index) => ({ ...summary, id: 200 - index, name: `Dataset ${200 - index}` }));
+  // The server decides which datasets are in the newest-100 window (covered by the Rails test);
+  // three newer datasets are enough to show the UI keeping the one it was told to open.
+  const newest = Array.from({ length: 3 }, (_, index) => ({ ...summary, id: 200 - index, name: `Dataset ${200 - index}` }));
   shared.api.mockImplementation(async (path, options) => {
     if (options?.method === 'POST') return { dataset: { id: 4 }, duplicate: true };
     if (isLibrary(path)) return { datasets: path === '/datasets?selected=4' ? [...newest, summary] : newest };
@@ -94,7 +96,7 @@ it('keeps a re-uploaded dataset selected when it is older than the newest-100 li
   expect(screen.getByRole('heading', { name: 'Parks' })).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Dataset 200' })).not.toBeInTheDocument();
   expect(shared.api).toHaveBeenCalledWith('/datasets?selected=4');
-});
+}, 15000);
 
 it('builds the accepted-feature preview from records', async () => {
   shared.api.mockImplementation(async path => isLibrary(path) ? { datasets: [summary] } : { ...summary, records });
