@@ -31,13 +31,16 @@ module Api
     def create
       dataset, created = Dataset.import!(user: current_user, name: params[:name], source_text: params[:source],
                                          required_attributes: params.fetch(:required_attributes, ["asset_id"]))
-      enqueue(dataset) if created
+      # Uploading the same file again also resumes a validation its worker abandoned.
+      enqueue(dataset) if created || resume_if_abandoned(dataset)
       render json: { dataset: dataset.summary, duplicate: !created }, status: created ? :created : :ok
     end
 
     def retry
       @dataset.with_lock do
-        raise ArgumentError, "Only failed datasets can be retried" unless @dataset.status == "failed"
+        unless @dataset.status == "failed" || @dataset.abandoned?
+          raise ArgumentError, @dataset.status == "validating" ? "This dataset is still being validated" : "Only failed or abandoned datasets can be retried"
+        end
         @dataset.update!(status: "queued", failure_message: nil)
       end
       enqueue(@dataset)
@@ -59,6 +62,10 @@ module Api
     end
 
     private
+
+    def resume_if_abandoned(dataset)
+      dataset.with_lock { dataset.abandoned? && dataset.update!(status: "queued", failure_message: nil) }
+    end
 
     def enqueue(dataset)
       raise ActiveJob::EnqueueError, 'Validation enqueue was cancelled' unless ValidateDatasetJob.perform_later(dataset.id)

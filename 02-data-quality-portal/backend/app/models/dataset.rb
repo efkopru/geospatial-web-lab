@@ -72,6 +72,23 @@ class Dataset < ApplicationRecord
     text.valid_encoding? && !text.include?("\u0000")
   end
 
+  # The session advisory lock ValidateDatasetJob holds while it validates this dataset.
+  def self.validation_lock_key(id) = 720_000_000 + id
+
+  # A dataset is abandoned when it is still marked validating but no worker holds its lock, for
+  # example after a worker process was killed: PostgreSQL releases a session lock when its
+  # connection ends. pg_locks shows a bigint key's high half as classid and its low half as objid.
+  # Reading pg_locks, rather than taking the lock, never blocks a worker that is starting.
+  def abandoned?
+    return false unless status == "validating"
+    key = Dataset.validation_lock_key(id)
+    !Dataset.connection.select_value(Dataset.sanitize_sql_array([<<~SQL, key >> 32, key & 0xFFFF_FFFF]))
+      SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND granted
+        AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
+        AND classid = ? AND objid = ? AND objsubid = 1)
+    SQL
+  end
+
   def self.canonical(value)
     case value
     when Hash then value.keys.sort.to_h { |key| [key, canonical(value[key])] }
@@ -96,6 +113,7 @@ class Dataset < ApplicationRecord
   def summary(version: dataset_version)
     as_json(only: %i[id name status total_count processed_count valid_count invalid_count required_attributes failure_message created_at updated_at]).merge(
       "owner" => user.name,
+      "abandoned" => abandoned?,
       "version" => version&.as_json(only: %i[id digest feature_count created_at])
     )
   end

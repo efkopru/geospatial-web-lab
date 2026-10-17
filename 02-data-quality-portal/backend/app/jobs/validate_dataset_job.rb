@@ -11,7 +11,7 @@ class ValidateDatasetJob < ApplicationJob
     ActiveRecord::Base.connection_pool.with_connection do |connection|
       # A session advisory lock permits visible progress commits while preventing
       # duplicate Sidekiq deliveries from processing the same dataset concurrently.
-      lock_id = 720_000_000 + dataset.id
+      lock_id = Dataset.validation_lock_key(dataset.id)
       locked = connection.select_value("SELECT pg_try_advisory_lock(#{lock_id})")
       return unless locked
       begin
