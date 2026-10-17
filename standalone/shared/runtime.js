@@ -52,7 +52,7 @@ let active;
 export function getRuntime(){if(!active)throw new Error('Standalone application was not initialized.');return active;}
 export function configureStandalone(options){active?.dispose();active=createRuntime(options);return active;}
 
-export function createRuntime({id,seed,handle,start,prepareRestore,store=new LocalStore(id),environment=globalThis}){
+export function createRuntime({id,seed,handle,start,validateRestore,prepareRestore,store=new LocalStore(id),environment=globalThis}){
  let state,user=USERS[0],revision=0,dataRevision=0,disposed=false,stop,channel;
  const listeners=new Set();
  const meta={loading:true,error:'',persistent:false,savedAt:null,coordinated:!!environment.navigator?.locks};
@@ -82,7 +82,7 @@ export function createRuntime({id,seed,handle,start,prepareRestore,store=new Loc
  // does not clone and check the same file twice.
  let shape;const validated=new WeakMap();
  const backupState=async value=>{
-  if(!validated.has(value)){shape??=(async()=>{const reference=await seed();return {reference,shapes:recordShapes(reference)};})();const {reference,shapes}=await shape;const state=checkBackup(value,id,reference,shapes);prepareRestore?.(state);validated.set(value,state);}
+  if(!validated.has(value)){shape??=(async()=>{const reference=await seed();return {reference,shapes:recordShapes(reference)};})();const {reference,shapes}=await shape;const state=checkBackup(value,id,reference,shapes);validateRestore?.(state,{users:USERS});prepareRestore?.(state);validated.set(value,state);}
   return validated.get(value);
  };
  const persist=async(draft,baseRevision=dataRevision,base)=>{const value=envelope(draft,baseRevision);try{await store.put(value,{expectedRevision:baseRevision,base});}catch(error){if(error.status===409)throw error;throw new Error(`Changes were not saved: ${error.message}. Export a backup or free browser storage.`,{cause:error});}apply(value);meta.error='';};

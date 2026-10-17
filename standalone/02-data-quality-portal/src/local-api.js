@@ -1,3 +1,4 @@
+import { check, orNull, oneOf, uniqueIds, refersTo, counterAbove } from '../../shared/backup-check.js';
 import GeoJSONReader from 'jsts/org/locationtech/jts/io/GeoJSONReader.js';
 import IsValidOp from 'jsts/org/locationtech/jts/operation/valid/IsValidOp.js';
 import { cleanSample, errorSample, cleanDigest } from './sample-data.js';
@@ -173,4 +174,24 @@ export async function handle({ path, method, body = {} }, { state, user, users, 
     return { dataset: summary(item, users) };
   }
   fail('Unsupported data-quality operation', 405);
+}
+
+// Checks a backup's state before it may replace local data: every dataset's fields and records,
+// ids, the people it names, the version an approved dataset exports, and the next-id counter.
+export function validateRestore(state, { users }) {
+  const userIds = new Set(users.map(user => user.id));
+  check(state.datasets, [{ id: 'integer', name: 'string', user_id: 'integer', source: { type: oneOf('FeatureCollection'), features: ['any'] }, source_fingerprint: 'string',
+    required_attributes: ['string'], status: oneOf('queued', 'validating', 'ready', 'approved', 'failed'), total_count: 'integer', processed_count: 'integer', valid_count: 'integer',
+    invalid_count: 'integer', failure_message: 'string?', created_at: 'string', updated_at: 'string', 'source_bytes?': 'integer',
+    records: [{ id: 'integer', ordinal: 'integer', feature: 'any', accepted: 'boolean', validation_errors: ['string'] }],
+    version: orNull({ id: 'integer', digest: 'string', feature_count: 'integer', created_at: 'string', approved_by: 'integer', export_json: 'string' }) }], 'datasets');
+  state.datasets.forEach((dataset, index) => {
+    const path = `datasets[${index}]`;
+    refersTo(dataset.user_id, userIds, `${path}.user_id`, 'user');
+    if (dataset.version) refersTo(dataset.version.approved_by, userIds, `${path}.version.approved_by`, 'user');
+    else if (dataset.status === 'approved') check(dataset.version, 'object', `${path}.version`);
+    uniqueIds(dataset.records, `${path}.records`);
+  });
+  uniqueIds(state.datasets, 'datasets');
+  counterAbove(state.nextId, state.datasets.map(dataset => dataset.id), 'nextId');
 }

@@ -1,3 +1,4 @@
+import {check,orNull,oneOf,between,latitude,longitude,uniqueIds,refersTo,counterAbove} from '../../shared/backup-check.js';
 const CATEGORIES=['roads','lighting','drainage','parks'];
 const STATUSES=['new','assigned','in_progress','resolved'];
 const TRANSITIONS={new:['assigned'],assigned:['in_progress'],in_progress:['resolved','assigned'],resolved:['in_progress']};
@@ -97,4 +98,21 @@ export async function handle({path,method,body={},query=new URLSearchParams()},c
  const download=path.match(/^\/api\/export_runs\/(\d+)\/download$/);
  if(download&&method==='GET'){requireStaff();const run=owned(state.exports,ctx,download[1]);return {download:{filename:`standalone-service-requests-${run.id}.csv`,mime:'text/csv;charset=utf-8',content:run.content}};}
  fail(`Unknown local route: ${method} ${path}`,404);
+}
+
+// Checks a backup's state before it may replace local data: every record's fields, its id,
+// the people it names and each next-id counter.
+export function validateRestore(state,{users}){
+ const userIds=new Set(users.map(x=>x.id)),staffIds=new Set(users.filter(x=>x.role==='staff').map(x=>x.id));
+ const personRef={id:'integer',name:'string'};
+ check(state.issues,[{id:'integer',title:'string',description:'string',category:oneOf(...CATEGORIES),status:oneOf(...STATUSES),latitude,longitude,
+  reporter:personRef,assigned_to:orNull(personRef),lock_version:between(0,Number.MAX_SAFE_INTEGER,'integer'),created_at:'string',updated_at:'string',resolved_at:'string?'}],'issues');
+ check(state.imports,[{id:'integer',requested_by:'integer',digest:'string',status:'string',imported_count:'integer',processed_count:'integer',total_count:'integer',errors:[{row:'integer',message:'string'}],failure:'string?',created_at:'string'}],'imports');
+ check(state.exports,[{id:'integer',requested_by:'integer',status:'string',record_count:'integer',created_at:'string',content:'string',failure:'string?'}],'exports');
+ state.issues.forEach((issue,index)=>{
+  refersTo(issue.reporter.id,userIds,`issues[${index}].reporter.id`,'user');
+  if(issue.assigned_to)refersTo(issue.assigned_to.id,staffIds,`issues[${index}].assigned_to.id`,'staff member');
+ });
+ for(const key of ['imports','exports'])state[key].forEach((run,index)=>refersTo(run.requested_by,userIds,`${key}[${index}].requested_by`,'user'));
+ for(const [key,counter] of [['issues','nextIssue'],['imports','nextImport'],['exports','nextExport']]){uniqueIds(state[key],key);counterAbove(state[counter],state[key].map(x=>x.id),counter);}
 }

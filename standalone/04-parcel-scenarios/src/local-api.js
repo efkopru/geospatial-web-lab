@@ -1,3 +1,4 @@
+import { check, oneOf, between, position, atLeast, uniqueIds, refersTo, counterAbove } from '../../shared/backup-check.js';
 const EARTH_RADIUS_M = 6371008.8;
 const SQFT_PER_M2 = 10.76391041671;
 const AREA_METHOD = 'Spherical geographic rectangle area; mean Earth radius 6371008.8 m. This browser edition does not use PostGIS ellipsoidal area.';
@@ -100,4 +101,25 @@ export function handle({ path, method = 'GET', body = {}, query = new URLSearchP
     }
   }
   fail(`Unknown local route: ${method} ${path}`, 404);
+}
+
+// Checks a backup's state before it may replace local data: every record's fields, its id, the
+// parcels and people it names, the results a completed scenario shows, and the next-id counter.
+export function validateRestore(state, { users }) {
+  const userIds = new Set(users.map((user) => user.id));
+  check(state.parcels, [{ id: 'integer', name: 'string', district: 'string', height_limit: 'integer', area_m2: between(0, Number.MAX_VALUE),
+    boundary: { type: oneOf('Polygon'), coordinates: atLeast(1, atLeast(4, position)) } }], 'parcels');
+  check(state.scenarios, [{ id: 'integer', user_id: 'integer', name: 'string', floors: between(1, 30, 'integer'), coverage: between(0.05, 0.8), unit_area: between(400, 3000, 'integer'),
+    parcel_ids: atLeast(1, 'integer'), status: oneOf('queued', 'processing', 'complete', 'failed'), revision: 'integer', created_at: 'string', updated_at: 'string', error_message: 'string?', results: 'object' }], 'scenarios');
+  uniqueIds(state.parcels, 'parcels');
+  const parcelIds = new Set(state.parcels.map((parcel) => parcel.id));
+  state.scenarios.forEach((scenario, index) => {
+    const path = `scenarios[${index}]`;
+    refersTo(scenario.user_id, userIds, `${path}.user_id`, 'user');
+    scenario.parcel_ids.forEach((id, slot) => refersTo(id, parcelIds, `${path}.parcel_ids[${slot}]`, 'parcel'));
+    // The table, comparison charts and export read these once a scenario is complete.
+    if (scenario.status === 'complete') check(scenario.results, { units: 'number', gross_floor_area_sqft: 'number', open_space_sqft: 'number', floor_area_ratio: 'number', warnings: ['string'] }, `${path}.results`);
+  });
+  uniqueIds(state.scenarios, 'scenarios');
+  counterAbove(state.nextScenarioId, state.scenarios.map((scenario) => scenario.id), 'nextScenarioId');
 }

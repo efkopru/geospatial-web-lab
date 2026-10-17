@@ -1,3 +1,4 @@
+import { check, orNull, oneOf, position, atLeast, longitude as validLongitude, latitude as validLatitude, uniqueIds, refersTo, counterAbove } from '../../shared/backup-check.js';
 // Synthetic fleet domain. No Rails, database server, or WebSocket is required.
 export const HISTORY_LIMIT = 360;
 export const EVENT_LIMIT = 500;
@@ -236,4 +237,34 @@ export function start(runtime, environment = globalThis) {
     });
   }).catch(failure);
   return cleanup;
+}
+
+// Checks a backup's state before it may replace local data: replay settings, every record's
+// fields and id, the vehicles and zones each record names, zone rings, and the next-id counters.
+export function validateRestore(state) {
+  check(state.replay, { running: 'boolean', cursor: 'integer', sequence: 'integer', generation: 'integer', speed: oneOf(1, 2, 4) }, 'replay');
+  check(state.vehicles, [{ id: 'integer', name: 'string', registration: 'string', color: 'string', longitude: orNull(validLongitude), latitude: orNull(validLatitude),
+    speed_kph: 'number', captured_at: 'string?', last_sequence: 'integer', inside_geofences: ['integer'], route: atLeast(2, position), route_offset: 'integer' }], 'vehicles');
+  check(state.geofences, [{ id: 'integer', name: 'string', color: 'string', coordinates: (ring) => validRing(ring) ? undefined : 'must be a closed, non-intersecting ring of 4 to 200 positions' }], 'geofences');
+  check(state.events, [{ id: 'integer', vehicle_id: 'integer', vehicle_name: 'string', geofence_id: 'integer', geofence_name: 'string', transition: oneOf('entered', 'exited'), sequence: 'integer', captured_at: 'string' }], 'events');
+  check(state.points, 'object', 'points');
+  const pointSchema = [{ id: 'integer', sequence: 'integer', longitude: validLongitude, latitude: validLatitude, speed_kph: 'number', captured_at: 'string' }];
+  uniqueIds(state.vehicles, 'vehicles');
+  uniqueIds(state.geofences, 'geofences');
+  const vehicleIds = new Set(state.vehicles.map((vehicle) => vehicle.id)), fenceIds = new Set(state.geofences.map((fence) => fence.id));
+  state.vehicles.forEach((vehicle, index) => vehicle.inside_geofences.forEach((id, slot) => refersTo(id, fenceIds, `vehicles[${index}].inside_geofences[${slot}]`, 'geofence')));
+  state.events.forEach((event, index) => {
+    refersTo(event.vehicle_id, vehicleIds, `events[${index}].vehicle_id`, 'vehicle');
+    refersTo(event.geofence_id, fenceIds, `events[${index}].geofence_id`, 'geofence');
+  });
+  const points = Object.entries(state.points).flatMap(([vehicleId, trail]) => {
+    refersTo(Number(vehicleId), vehicleIds, `points["${vehicleId}"]`, 'vehicle');
+    check(trail, pointSchema, `points["${vehicleId}"]`);
+    return trail;
+  });
+  uniqueIds(state.events, 'events');
+  uniqueIds(points, 'points');
+  counterAbove(state.nextFenceId, state.geofences.map((fence) => fence.id), 'nextFenceId');
+  counterAbove(state.nextEventId, state.events.map((event) => event.id), 'nextEventId');
+  counterAbove(state.nextPointId, points.map((point) => point.id), 'nextPointId');
 }
