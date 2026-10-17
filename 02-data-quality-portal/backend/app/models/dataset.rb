@@ -6,7 +6,7 @@ class Dataset < ApplicationRecord
   belongs_to :user
   has_many :dataset_records, dependent: :destroy
   has_one :dataset_version
-  validates :name, presence: true, length: { maximum: 120 }
+  validates :name, presence: true, length: { maximum: 120 }, format: { without: /\u0000/, message: "cannot contain the NUL character" }
   validates :status, inclusion: { in: %w[queued validating ready approved failed] }
   validates :source_digest, presence: true, uniqueness: { scope: :user_id }
 
@@ -19,6 +19,9 @@ class Dataset < ApplicationRecord
     end
     unless source["features"].size.between?(1, MAX_FEATURES)
       raise ArgumentError, "Upload must contain 1 to #{MAX_FEATURES} features"
+    end
+    if (location = unstorable_text_location(source))
+      raise ArgumentError, "#{location} contains the NUL character (\\u0000), which cannot be stored. Remove it and upload again."
     end
     unless required_attributes.is_a?(Array) && required_attributes.all? { |attribute| attribute.is_a?(String) }
       raise ArgumentError, "Required attributes must be an array of attribute names"
@@ -42,6 +45,31 @@ class Dataset < ApplicationRecord
     # the initial lookup. It must have the same reuse behavior as a unique-index race.
     raise unless error.record.is_a?(Dataset) && error.record.errors.attribute_names == [:source_digest] && error.record.errors.of_kind?(:source_digest, :taken)
     [find_by!(user: user, source_digest: fingerprint), false]
+  end
+
+  # PostgreSQL text and jsonb cannot store U+0000, which valid JSON may encode as \u0000. Every
+  # key and string value is checked so the upload is rejected with its location, not on insert.
+  def self.unstorable_text_location(value, path = nil)
+    case value
+    when Hash
+      value.each do |key, item|
+        return "A property name in #{path || 'the file'}" unless storable_text?(key)
+        found = unstorable_text_location(item, [path, key].compact.join("."))
+        return found if found
+      end
+    when Array
+      value.each_with_index do |item, index|
+        found = unstorable_text_location(item, "#{path}[#{index}]")
+        return found if found
+      end
+    when String
+      return "The value at #{path}" unless storable_text?(value)
+    end
+    nil
+  end
+
+  def self.storable_text?(text)
+    text.valid_encoding? && !text.include?("\u0000")
   end
 
   def self.canonical(value)
