@@ -1,9 +1,23 @@
 class ProfileRun < ApplicationRecord
   belongs_to :user
   validates :status, inclusion: { in: %w[pending processing completed failed] }
+  # First key of the session advisory lock ProfileJob holds for a whole run; the run id is the second.
+  ADVISORY_LOCK_KEY = 10501
+
+  # A run is abandoned when it is still 'processing' but no worker holds its lock, for example after
+  # a worker process was killed: PostgreSQL releases a session lock when its connection ends.
+  # pg_locks is read rather than the lock taken, so this check never blocks a worker that is starting.
+  def abandoned?
+    status == "processing" && !self.class.connection.select_value(self.class.sanitize_sql_array([<<~SQL, ADVISORY_LOCK_KEY, id]))
+      SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND granted
+        AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
+        AND classid = ? AND objid = ? AND objsubid = 2)
+    SQL
+  end
 
   def payload
-    as_json(only: %i[id status generation summary error_message completed_at created_at]).merge("source" => "Synthetic asset elevations; linear interpolation; not a DEM")
+    as_json(only: %i[id status generation summary error_message completed_at created_at]).merge(
+      "abandoned" => abandoned?, "source" => "Synthetic asset elevations; linear interpolation; not a DEM")
   end
 
   def document

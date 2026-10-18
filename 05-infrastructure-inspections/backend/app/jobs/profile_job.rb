@@ -2,6 +2,22 @@ class ProfileJob < ApplicationJob
   queue_as :default
 
   def perform(id, generation)
+    ActiveRecord::Base.connection_pool.with_connection do |connection|
+      # Held for the whole run, so a run left 'processing' by a lost worker can be told apart from
+      # one still being built (see ProfileRun#abandoned?). A second delivery of the same run exits.
+      locked = connection.select_value("SELECT pg_try_advisory_lock(#{ProfileRun::ADVISORY_LOCK_KEY}, #{Integer(id)})")
+      return unless locked
+      begin
+        process(id, generation)
+      ensure
+        connection.execute("SELECT pg_advisory_unlock(#{ProfileRun::ADVISORY_LOCK_KEY}, #{Integer(id)})")
+      end
+    end
+  end
+
+  private
+
+  def process(id, generation)
     run = ProfileRun.find(id)
     run.with_lock do
       return unless run.generation == generation && %w[pending processing].include?(run.status)
@@ -10,8 +26,6 @@ class ProfileJob < ApplicationJob
     broadcast(run)
     run.with_lock do
       return unless run.generation == generation && run.status == "processing"
-      # Serialize duplicate deliveries while allowing a replacement worker to
-      # resume a processing record left behind by an interrupted process.
       result = CorridorProfile.build(run.asset_snapshot)
       run.update!(status: "completed", samples: result[:samples], summary: result[:summary], completed_at: Time.current)
     end
@@ -25,8 +39,6 @@ class ProfileJob < ApplicationJob
     end
     Rails.logger.error("Profile job failed: #{error.class}: #{error.message}")
   end
-
-  private
 
   def broadcast(run)
     ActionCable.server.broadcast("infrastructure_inspections", { type: "profile.updated", id: run.id, status: run.status })
