@@ -9,6 +9,7 @@ module Api
 
     def create
       run = ExportRun.create!(requested_by: current_user)
+      ExportRun.prune_for(current_user)
       begin
         raise ActiveJob::EnqueueError, 'Export enqueue was cancelled' unless ExportIssuesJob.perform_later(run.id)
       rescue StandardError => error

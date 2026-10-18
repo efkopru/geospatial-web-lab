@@ -72,6 +72,28 @@ class DatasetSecondAuditTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test 'stored source is limited per account while re-uploads still reopen existing datasets' do
+    post '/api/datasets', params: {name: 'Within budget', source: @source}, as: :json
+    assert_response :created
+    first = Dataset.find(response.parsed_body.dig('dataset', 'id'))
+    assert_equal JSON.generate(JSON.parse(@source)).bytesize, first.source_bytes
+    remaining = Dataset::MAX_STORED_SOURCE_BYTES_PER_USER - first.source_bytes
+    Dataset.create!(user: @reporter, name: 'Filler', source: {'type' => 'FeatureCollection', 'features' => []}, source_digest: 'filler', total_count: 1, source_bytes: remaining - 10)
+    changed = JSON.parse(@source).tap { |source| source['features'][0]['properties']['asset_id'] = 'changed' }
+    assert_no_difference 'Dataset.count' do
+      post '/api/datasets', params: {name: 'Over budget', source: JSON.generate(changed)}, as: :json
+    end
+    assert_response :unprocessable_entity
+    assert_match(/\AThis \d+ KB dataset would bring your stored datasets to 50\.0 MB, over the 50\.0 MB limit for one account \(50\.0 MB already stored\)\z/, response.parsed_body['error'])
+    post '/api/datasets', params: {name: 'Within budget again', source: @source}, as: :json
+    assert_response :success
+    assert_equal [true, first.id], [response.parsed_body['duplicate'], response.parsed_body.dig('dataset', 'id')]
+    other = User.create!(email: 'budget-other@example.test', name: 'Other Reporter', role: 'reporter', password: 'Learning123!')
+    post '/api/session', params: {email: other.email, password: 'Learning123!'}, as: :json
+    post '/api/datasets', params: {name: 'Another account', source: JSON.generate(changed)}, as: :json
+    assert_response :created
+  end
+
   test 'ordinary Unicode in names, keys and values is stored unchanged' do
     source = {type: 'FeatureCollection', features: [{type: 'Feature', properties: {asset_id: 'u-1', '名前' => 'Café ✓ Zürich 東京 😀'}, geometry: {type: 'Point', coordinates: [-97, 33]}}]}
     post '/api/datasets', params: {name: 'Ünïcode parks 🌳', source: JSON.generate(source)}, as: :json
