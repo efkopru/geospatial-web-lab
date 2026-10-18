@@ -134,9 +134,29 @@ The affected fleet domain suite passed locally with 20 tests and 101 assertions,
 
 ### Merged state (October 5, 2026)
 
-On `main` at 146f111, after PRs #10 and #11 merged, 145 backend tests with 972 assertions passed locally (service requests 31/233, data quality 28/193, fleet 30/167, parcels 25/156, inspections 31/223). Root Vitest passed 50 tests across 11 suites, and `npm run lint` reported no problems. The lint and scan, full-stack (including the Playwright scenarios), standalone, and container workflows all passed on that commit.
+On `main` at f4eb28b, after PRs #10 and #11 merged, 145 backend tests with 972 assertions passed locally (service requests 31/233, data quality 28/193, fleet 30/167, parcels 25/156, inspections 31/223). Root Vitest passed 50 tests across 11 suites, and `npm run lint` reported no problems. The lint and scan, full-stack (including the Playwright scenarios), standalone, and container workflows all passed on that commit.
+
+## Issue fixes (October 17, 2026)
+
+Fixes for issues #16–#22, checked locally on the issue-fixes branch:
+
+| Project | Tests | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Service requests | 34 | 265 | Passed |
+| Data quality portal | 34 | 266 | Passed |
+| Fleet monitor | 33 | 194 | Passed |
+| Parcel scenarios | 25 | 156 | Passed |
+| Infrastructure inspections | 31 | 223 | Passed |
+| Total | 157 | 1104 | No failures, errors, or skipped tests |
+
+- Root Vitest passed 57 tests across 13 files; the standalone editions passed 71 domain and storage tests and 10 interface tests. The copied-file and runtime-script checks passed 30 tests. ESLint reported no problems, Brakeman no warnings, and all five Vite builds and the standalone build passed. The built standalone site passed `verify:site` and `verify:browser` against a local preview.
+- Each new regression test was also run against the code before its fix and failed there.
+- Abandoned-work recovery (#17) covers imports left `processing` and validations left `validating` with no session holding the job's advisory lock. It does not detect a job lost from the queue before a worker started it, because that is indistinguishable from one still waiting; a stuck export can be replaced by generating a new report.
+- Not run locally: the Playwright scenarios against running services and the container image builds. The CI and container workflows run both.
 
 ## Boundaries
+
+The repository history was rewritten in October 2026 to change the commit author email; file contents are unchanged. Commit hashes in these records refer to the rewritten history.
 
 Docker Desktop's engine failed to start in the original audit environment, so container image builds and runtime execution were **not verified** locally. They were later verified on GitHub Actions; see [Container verification](#container-verification-october-1-2026). The same applications were run and tested directly in WSL. At the time of this local audit, the workspace had not yet been published and remote CI had not run. Subsequent CI results are recorded in [GitHub Actions](https://github.com/efkopru/geospatial-web-lab/actions). No public application hosting was created then. The standalone browser editions were later published as a static demo; see the [standalone verification record](standalone/VERIFICATION.md#public-deployment-october-1-2026). The full-stack applications remain unhosted.
 

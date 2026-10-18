@@ -362,6 +362,45 @@ test('restore rejects records missing or mistyping the fields handlers read, wit
   }
 });
 
+test('restore rejects records, references and counters the apps cannot use, in every collection, without changing stored data', async () => {
+  const cases = [
+    // The three cases reported in issue #16.
+    ['05-infrastructure-inspections', state => { delete state.profileRuns[0].samples; }, 'profileRuns[0].samples is missing.'],
+    ['01-service-requests', state => { state.issues[0].reporter = {}; }, 'issues[0].reporter.id is missing.'],
+    ['01-service-requests', state => { state.nextIssue = 1; }, 'nextIssue must be an integer greater than 8, the highest id in use.'],
+    // Collections that are empty in the seed are checked too.
+    ['01-service-requests', state => { state.imports[0].requested_by = 99; }, 'imports[0].requested_by refers to user 99, which does not exist.'],
+    ['01-service-requests', state => { state.exports.push({ id: 2 }); }, 'exports[1].requested_by is missing.'],
+    ['02-data-quality-portal', state => { state.datasets[2].records[1].id = state.datasets[2].records[0].id; }, 'datasets[2].records[1].id repeats id'],
+    ['02-data-quality-portal', state => { state.datasets[0].version = null; }, 'datasets[0].version must be an object.'],
+    ['03-fleet-monitor', state => { state.vehicles[0].route = []; }, 'vehicles[0].route must contain at least 2 items.'],
+    ['03-fleet-monitor', state => { state.nextPointId = 1; }, 'nextPointId must be an integer greater than'],
+    ['03-fleet-monitor', state => { state.vehicles[0].inside_geofences = [99]; }, 'vehicles[0].inside_geofences[0] refers to geofence 99, which does not exist.'],
+    ['04-parcel-scenarios', state => { state.scenarios[0].parcel_ids = [999]; }, 'scenarios[0].parcel_ids[0] refers to parcel 999, which does not exist.'],
+    ['04-parcel-scenarios', state => { state.scenarios[0].results = {}; }, 'scenarios[0].results.units is missing.'],
+    ['05-infrastructure-inspections', state => { state.inspections[0].infrastructure_asset_id = 999; }, 'inspections[0].infrastructure_asset_id refers to asset 999, which does not exist.'],
+    ['05-infrastructure-inspections', state => { state.nextEventId = 2; }, 'nextEventId must be an integer greater than']
+  ];
+  for (const [app, corrupt, message] of cases) {
+    const adapter = await import(`../${app}/src/local-api.js`);
+    const indexedDB = new IDBFactory();
+    let runtime = await openApp(app, adapter, indexedDB);
+    try {
+      await ACTIVITY[app](runtime, adapter);
+      const backup = JSON.parse(JSON.stringify(await runtime.backup()));
+      corrupt(backup.state);
+      const before = runtime.read(), revision = runtime.revision, savedAt = runtime.meta.savedAt;
+      await assert.rejects(runtime.restore(backup), error => error.message.includes(message), `${app}: ${message}`);
+      assert.deepEqual(runtime.read(), before, app);
+      assert.equal(runtime.revision, revision, app);
+      assert.equal(runtime.meta.savedAt, savedAt, app);
+      runtime.dispose();
+      runtime = await openApp(app, adapter, indexedDB);
+      assert.deepEqual(runtime.read(), before, `${app} after reopening`);
+    } finally { runtime.dispose(); }
+  }
+});
+
 test('a restored fleet replay is paused, so a tab already holding the replay lock does not resume it', async () => {
   const fleet = await import('../03-fleet-monitor/src/local-api.js');
   const source = await openApp('03-fleet-monitor', fleet);

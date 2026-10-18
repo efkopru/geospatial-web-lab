@@ -25,6 +25,62 @@ class DatasetSecondAuditTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test 'an escaped NUL anywhere in the source is rejected with its location before anything is stored' do
+    feature = ->(properties) { {type: 'FeatureCollection', features: [{type: 'Feature', properties: properties, geometry: {type: 'Point', coordinates: [-97, 33]}}]} }
+    {
+      {asset_id: 'review-1', name: "harmless\u0000text"} => 'The value at features[0].properties.name',
+      {asset_id: 'review-1', details: {notes: ["fine", "bad\u0000"]}} => 'The value at features[0].properties.details.notes[1]',
+      {asset_id: 'review-1', "key\u0000" => 'value'} => 'A property name in features[0].properties'
+    }.each do |properties, location|
+      assert_no_difference ['Dataset.count', 'DatasetRecord.count'] do
+        post '/api/datasets', params: {name: 'NUL check', source: JSON.generate(feature.call(properties))}, as: :json
+      end
+      assert_response :unprocessable_entity
+      assert_equal "#{location} contains the NUL character (\\u0000), which cannot be stored. Remove it and upload again.", response.parsed_body['error']
+    end
+    assert_no_difference 'Dataset.count' do
+      post '/api/datasets', params: {name: "Name\u0000", source: @source}, as: :json
+    end
+    assert_response :unprocessable_entity
+    assert_match 'Name cannot contain the NUL character', response.parsed_body['error']
+  end
+
+  test 'a dataset reopened by uploading it again stays listed when it is older than the newest 100' do
+    post '/api/datasets', params: {name: 'Original', source: @source}, as: :json
+    assert_response :created
+    original = response.parsed_body.dig('dataset', 'id')
+    empty = {'type' => 'FeatureCollection', 'features' => []}
+    Api::DatasetsController::LIBRARY_LIMIT.times do |index|
+      Dataset.create!(user: @reporter, name: "Newer #{index}", source: empty, source_digest: "newer-#{index}", total_count: 1)
+    end
+    post '/api/datasets', params: {name: 'Original again', source: @source}, as: :json
+    assert_response :success
+    assert_equal [true, original], [response.parsed_body['duplicate'], response.parsed_body.dig('dataset', 'id')]
+    get '/api/datasets'
+    assert_not_includes response.parsed_body['datasets'].map { |dataset| dataset['id'] }, original
+    get '/api/datasets', params: {selected: original.to_s}
+    ids = response.parsed_body['datasets'].map { |dataset| dataset['id'] }
+    assert_equal [Api::DatasetsController::LIBRARY_LIMIT + 1, original], [ids.length, ids.last]
+    other = User.create!(email: 'other-library@example.test', name: 'Other', role: 'reporter', password: 'Learning123!')
+    foreign = Dataset.create!(user: other, name: 'Private', source: empty, source_digest: 'foreign', total_count: 1)
+    [foreign.id.to_s, 'not-a-number'].each do |selected|
+      get '/api/datasets', params: {selected: selected}
+      assert_response :success
+      ids = response.parsed_body['datasets'].map { |dataset| dataset['id'] }
+      assert_equal Api::DatasetsController::LIBRARY_LIMIT, ids.length
+      assert_not_includes ids, foreign.id
+    end
+  end
+
+  test 'ordinary Unicode in names, keys and values is stored unchanged' do
+    source = {type: 'FeatureCollection', features: [{type: 'Feature', properties: {asset_id: 'u-1', '名前' => 'Café ✓ Zürich 東京 😀'}, geometry: {type: 'Point', coordinates: [-97, 33]}}]}
+    post '/api/datasets', params: {name: 'Ünïcode parks 🌳', source: JSON.generate(source)}, as: :json
+    assert_response :created
+    dataset = Dataset.find(response.parsed_body.dig('dataset', 'id'))
+    assert_equal 'Ünïcode parks 🌳', dataset.name
+    assert_equal 'Café ✓ Zürich 東京 😀', dataset.source.dig('features', 0, 'properties', '名前')
+  end
+
   test 'an ambiguous queue acknowledgment preserves completed validation' do
     enqueue = ->(id) { ValidateDatasetJob.perform_now(id); raise IOError, 'Timeout after queue accepted the job' }
     replace_method(ValidateDatasetJob, :perform_later, enqueue) do

@@ -1,3 +1,4 @@
+import { check, oneOf, between, latitude as validLatitude, longitude as validLongitude, uniqueIds, refersTo, counterAbove } from '../../shared/backup-check.js';
 const RADIUS_M = 6371008.8;
 const INITIAL_TIME = '2026-09-29T15:00:00.000Z';
 // The workspace lists the newest 10 runs. Completed runs beyond the newest 20 are pruned so each
@@ -160,4 +161,42 @@ export function handle({ path, method = 'GET', body = {} }, context) {
     }
   }
   fail(`Unknown local route: ${method} ${path}`, 404);
+}
+
+const ASSET_SCHEMA = { id: 'integer', asset_code: 'string', name: 'string', kind: oneOf('pole', 'tower', 'cabinet'), longitude: validLongitude, latitude: validLatitude,
+  ground_elevation_m: 'number', structure_height_m: between(Number.MIN_VALUE, 300), corridor_order: 'integer' };
+
+// Checks a backup's state before it may replace local data: every record's fields, its id, the
+// assets and people it names, the output a completed profile needs, and each next-id counter.
+export function validateRestore(state, { users }) {
+  const userIds = new Set(users.map((user) => user.id));
+  check(state.assets, [ASSET_SCHEMA], 'assets');
+  check(state.inspections, [{ id: 'integer', infrastructure_asset_id: 'integer', author_id: 'integer', severity: oneOf('low', 'medium', 'high', 'critical'), notes: 'string',
+    status: oneOf('open', 'resolved'), lock_version: between(0, 2147483647, 'integer'), observed_at: 'string', created_at: 'string', resolution_notes: 'string?', resolved_at: 'string?',
+    resolved_by_id: 'integer?', events: [{ id: 'integer', actor_id: 'integer', action: oneOf('reported', 'resolved', 'reopened'), notes: 'string', created_at: 'string' }] }], 'inspections');
+  check(state.profileRuns, [{ id: 'integer', user_id: 'integer', status: oneOf('pending', 'processing', 'completed', 'failed'), generation: 'integer', created_at: 'string',
+    'completed_at?': 'string?', 'error_message?': 'string?', asset_snapshot: [ASSET_SCHEMA] }], 'profileRuns');
+  state.profileRuns.forEach((run, index) => {
+    // A completed run's chart, sample table and download read these; a failed run rebuilds them on retry.
+    if (run.status !== 'completed') return;
+    check(run.samples, [{ distance_m: 'number', longitude: validLongitude, latitude: validLatitude, elevation_m: 'number' }], `profileRuns[${index}].samples`);
+    check(run.summary, { length_m: 'number', min_ground_m: 'number', max_ground_m: 'number', max_top_m: 'number', asset_count: 'integer', sample_count: 'integer' }, `profileRuns[${index}].summary`);
+  });
+  uniqueIds(state.assets, 'assets');
+  const assetIds = new Set(state.assets.map((asset) => asset.id));
+  state.inspections.forEach((inspection, index) => {
+    const path = `inspections[${index}]`;
+    refersTo(inspection.infrastructure_asset_id, assetIds, `${path}.infrastructure_asset_id`, 'asset');
+    refersTo(inspection.author_id, userIds, `${path}.author_id`, 'user');
+    if (inspection.resolved_by_id !== null) refersTo(inspection.resolved_by_id, userIds, `${path}.resolved_by_id`, 'user');
+    inspection.events.forEach((event, position) => refersTo(event.actor_id, userIds, `${path}.events[${position}].actor_id`, 'user'));
+  });
+  state.profileRuns.forEach((run, index) => refersTo(run.user_id, userIds, `profileRuns[${index}].user_id`, 'user'));
+  const events = state.inspections.flatMap((inspection) => inspection.events);
+  uniqueIds(state.inspections, 'inspections');
+  uniqueIds(events, 'inspection events');
+  uniqueIds(state.profileRuns, 'profileRuns');
+  counterAbove(state.nextInspectionId, state.inspections.map((inspection) => inspection.id), 'nextInspectionId');
+  counterAbove(state.nextEventId, events.map((event) => event.id), 'nextEventId');
+  counterAbove(state.nextProfileId, state.profileRuns.map((run) => run.id), 'nextProfileId');
 }

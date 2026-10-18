@@ -7,6 +7,7 @@ class ReplayEngine
       case action
       when "start"
         unless replay.running?
+          raise ArgumentError, "The replay cannot advance: its next frame would exceed sequence #{TelemetryRecorder::MAX_SEQUENCE}. Reset the replay to continue." if sequences_exhausted?(replay)
           replay.update!(running: true, generation: replay.generation + 1)
           enqueue!(replay.generation, replay.cursor)
         end
@@ -31,8 +32,16 @@ class ReplayEngine
   def self.advance!(generation, expected_cursor)
     replay = ReplayControl.instance
     continue_replay = false
+    exhausted = false
     replay.with_lock do
       return false unless replay.running? && replay.generation == generation && replay.cursor == expected_cursor
+
+      if sequences_exhausted?(replay)
+        # Stop explicitly instead of failing every frame; starting again requires a reset.
+        replay.update!(running: false, generation: replay.generation + 1)
+        exhausted = true
+        next
+      end
 
       # Routes do not change during a replay; TelemetryRecorder re-reads each vehicle under its lock.
       vehicles = Vehicle.order(:id).select { |vehicle| vehicle.route.length >= 2 }
@@ -53,8 +62,13 @@ class ReplayEngine
       enqueue!(generation, replay.cursor, wait: 1.second)
       continue_replay = true
     end
-    broadcast! if continue_replay
+    broadcast! if continue_replay || exhausted
     continue_replay
+  end
+
+  # True when the next frame's sequence numbers would not fit the 32-bit columns.
+  def self.sequences_exhausted?(replay)
+    replay.sequence + replay.speed > TelemetryRecorder::MAX_SEQUENCE
   end
 
   # Geodesic lengths in metres of [[from, to], ...] longitude/latitude segments, in one query.

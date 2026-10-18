@@ -20,6 +20,8 @@ module Api
       digest = Digest::SHA256.hexdigest(encoded)
       run = ImportRun.find_by(requested_by: current_user, digest: digest)
       if run
+        # Uploading the same file again also resumes an import its worker abandoned.
+        return unless resume_if_abandoned(run)
         return render json: { import: run.as_payload, reused: true }, status: :ok
       end
       run = ImportRun.create!(requested_by: current_user, digest: digest, payload: payload)
@@ -36,7 +38,10 @@ module Api
     def retry
       run = ImportRun.where(requested_by: current_user).find(params[:id])
       run.with_lock do
-        return render json: { error: 'Only failed imports can be retried.' }, status: :conflict unless run.status == 'failed'
+        unless run.status == 'failed' || run.abandoned?
+          message = run.status == 'processing' ? 'This import is still being processed.' : 'Only failed or abandoned imports can be retried.'
+          return render json: { error: message }, status: :conflict
+        end
         run.update!(status: 'pending', failure: nil)
       end
       return unless enqueue(run)
@@ -44,6 +49,12 @@ module Api
     end
 
     private
+
+    # Returns false only when a resumed import could not be queued (enqueue then renders the error).
+    def resume_if_abandoned(run)
+      resumed = run.with_lock { run.abandoned? && run.update!(status: 'pending', failure: nil) }
+      resumed ? enqueue(run) : true
+    end
 
     def enqueue(run)
       raise ActiveJob::EnqueueError, 'Import enqueue was cancelled' unless ImportIssuesJob.perform_later(run.id)

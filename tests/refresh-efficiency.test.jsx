@@ -36,11 +36,12 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 // The first render chains several requests; under a busy parallel test run it can exceed
 // Testing Library's default one-second wait.
 const LOAD = { timeout: 5000 };
+const isLibrary = path => path === '/datasets' || path.startsWith('/datasets?');
 const detailCalls = () => shared.api.mock.calls.filter(([path]) => path === '/datasets/4').length;
 
 it('fetches dataset records again only when the dataset summary changes', async () => {
   let list = [summary];
-  shared.api.mockImplementation(async path => path === '/datasets' ? { datasets: list } : { ...list[0], records });
+  shared.api.mockImplementation(async path => isLibrary(path) ? { datasets: list } : { ...list[0], records });
   render(<PortalApp />);
   await screen.findByRole('heading', { name: 'Parks' }, LOAD);
   expect(detailCalls()).toBe(1);
@@ -56,7 +57,7 @@ it('limits record reads while a dataset validates', async () => {
   let clock = 1_000_000;
   vi.spyOn(Date, 'now').mockImplementation(() => clock);
   let list = [{ ...summary, status: 'validating', processed_count: 10, total_count: 100 }];
-  shared.api.mockImplementation(async path => path === '/datasets' ? { datasets: list } : { ...list[0], records });
+  shared.api.mockImplementation(async path => isLibrary(path) ? { datasets: list } : { ...list[0], records });
   render(<PortalApp />);
   await screen.findByRole('heading', { name: 'Parks' }, LOAD);
   expect(detailCalls()).toBe(1);
@@ -73,8 +74,32 @@ it('limits record reads while a dataset validates', async () => {
   expect(detailCalls()).toBe(3);
 });
 
+it('keeps a re-uploaded dataset selected when it is older than the newest-100 library', async () => {
+  // The server decides which datasets are in the newest-100 window (covered by the Rails test);
+  // three newer datasets are enough to show the UI keeping the one it was told to open.
+  const newest = Array.from({ length: 3 }, (_, index) => ({ ...summary, id: 200 - index, name: `Dataset ${200 - index}` }));
+  shared.api.mockImplementation(async (path, options) => {
+    if (options?.method === 'POST') return { dataset: { id: 4 }, duplicate: true };
+    if (isLibrary(path)) return { datasets: path === '/datasets?selected=4' ? [...newest, summary] : newest };
+    const id = Number(path.split('/').at(-1));
+    return { ...(id === 4 ? summary : newest.find(dataset => dataset.id === id)), records };
+  });
+  render(<PortalApp />);
+  await screen.findByRole('heading', { name: 'Dataset 200' }, LOAD);
+  fireEvent.click(screen.getByRole('button', { name: 'Upload GeoJSON' }));
+  fireEvent.change(screen.getByLabelText('Drop a GeoJSON file here or choose a file'), { target: { files: [{ size: 2, name: 'parks.geojson', text: async () => '{}' }] } });
+  await screen.findByText('parks.geojson');
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and validate' }));
+  expect(await screen.findByRole('heading', { name: 'Parks' }, LOAD)).toBeInTheDocument();
+  expect(screen.getByText(/This upload already exists. Opened the existing dataset/)).toBeInTheDocument();
+  await act(async () => { await shared.live(); await shared.live(); });
+  expect(screen.getByRole('heading', { name: 'Parks' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Dataset 200' })).not.toBeInTheDocument();
+  expect(shared.api).toHaveBeenCalledWith('/datasets?selected=4');
+}, 15000);
+
 it('builds the accepted-feature preview from records', async () => {
-  shared.api.mockImplementation(async path => path === '/datasets' ? { datasets: [summary] } : { ...summary, records });
+  shared.api.mockImplementation(async path => isLibrary(path) ? { datasets: [summary] } : { ...summary, records });
   render(<PortalApp />);
   await screen.findByText('Accepted feature preview', {}, LOAD);
   await waitFor(() => expect(shared.maps.at(-1)?.features.map(feature => feature.id)).toEqual([41]), LOAD);

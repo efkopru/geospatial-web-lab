@@ -129,7 +129,7 @@ These numbers describe single-tab browser work on synthetic data. Full-stack mea
 
 ## Public deployment (October 1, 2026)
 
-The standalone editions are published at [https://efkopru.github.io/geospatial-web-lab/](https://efkopru.github.io/geospatial-web-lab/) from `main` (commit `246bba4`). The [Publish standalone demo run](https://github.com/efkopru/geospatial-web-lab/actions/runs/36933360375) passed these steps:
+The standalone editions are published at [https://efkopru.github.io/geospatial-web-lab/](https://efkopru.github.io/geospatial-web-lab/) from `main` (commit `9834f86`). The [Publish standalone demo run](https://github.com/efkopru/geospatial-web-lab/actions/runs/36933360375) passed these steps:
 
 - the domain and interface tests and all five builds
 - a check of the built gallery through the local preview server
@@ -148,6 +148,8 @@ The [browser check](https://github.com/efkopru/geospatial-web-lab/actions/runs/3
 | 03 Fleet Monitor | saved, exported, restored, reloaded | changed vehicle name kept and shown; revision 1 → 2 |
 | 04 Parcel Scenarios | saved, exported, restored, reloaded | changed parcel name kept and shown; revision 1 → 2 |
 | 05 Inspections | saved, exported, restored, reloaded | changed asset name kept and shown; revision 1 → 2; Cesium canvas present |
+
+The demo was republished on October 6, 2026 from `main` at 9669f1b, after the October review fixes ([Publish standalone demo run](https://github.com/efkopru/geospatial-web-lab/actions/runs/37441992674)). Its tests, builds, deployment, live-site check and Chromium check all passed.
 
 No uncaught page errors were reported. The check does not wait for ArcGIS basemaps, and the four map apps had not drawn a map canvas by the time it finished, so live map rendering is not confirmed by this record.
 

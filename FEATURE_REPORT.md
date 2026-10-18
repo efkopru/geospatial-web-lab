@@ -2,7 +2,7 @@
 
 **Illustrated feature and workflow report**
 
-Documentation edition: September 29, 2026. Application baseline: `72205d5c0ad9fdcdf90c929e0b506c3280f7bf5f`.
+Documentation edition: September 29, 2026. Application baseline: `ea887e2ded95e1538239ac8abd21bac98267ba8f`.
 
 This report explains the implemented features of five working geospatial web applications, with 21 screenshots captured from their local browser interfaces. Each chapter covers the purpose of the app, its controls, the normal workflow, permissions, background operations, validation, exports, and recovery behavior. Screenshot pages follow each application's feature explanation. The shared sign-in screen appears after the architecture chapter.
 
@@ -429,7 +429,7 @@ Concurrency controls address specific failure modes: stale request assignments a
 
 ### Verification baseline
 
-The documented application baseline is commit `72205d5c0ad9fdcdf90c929e0b506c3280f7bf5f`. The September 29 local verification record reports the following completed checks. These are application checks recorded before this illustrated report, rather than tests created by taking screenshots.
+The documented application baseline is commit `ea887e2ded95e1538239ac8abd21bac98267ba8f`. The September 29 local verification record reports the following completed checks. These are application checks recorded before this illustrated report, rather than tests created by taking screenshots.
 
 | Evidence | Recorded result | What it supports |
 | --- | --- | --- |

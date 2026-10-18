@@ -1,14 +1,20 @@
 class TelemetryRecorder
   HISTORY_LIMIT = 360
   EVENT_LIMIT = 500
+  # Sequences are stored in 32-bit integer columns.
+  MAX_SEQUENCE = 2_147_483_647
+  # Manual telemetry may set the replay's sequence, so it leaves the replay at least a million
+  # further sequence numbers (about 69 hours at 4x speed) before it has to stop.
+  MAX_MANUAL_SEQUENCE = MAX_SEQUENCE - 1_000_000
 
-  def self.record!(vehicle:, sequence:, longitude:, latitude:, speed_kph: 0, captured_at: Time.current)
+  def self.record!(vehicle:, sequence:, longitude:, latitude:, speed_kph: 0, captured_at: Time.current, max_sequence: MAX_SEQUENCE)
     sequence = Integer(sequence.to_s, 10)
+    raise ArgumentError, "Sequence must be an integer from 0 to #{max_sequence}" unless sequence.between?(0, max_sequence)
     longitude = Float(longitude)
     latitude = Float(latitude)
     speed_kph = Float(speed_kph)
     raise ArgumentError, "Invalid telemetry coordinates or speed" unless longitude.finite? && latitude.finite? && speed_kph.finite? &&
-      longitude.between?(-180, 180) && latitude.between?(-90, 90) && speed_kph.between?(0, 250) && sequence >= 0
+      longitude.between?(-180, 180) && latitude.between?(-90, 90) && speed_kph.between?(0, 250)
 
     accepted = false
     vehicle.with_lock do

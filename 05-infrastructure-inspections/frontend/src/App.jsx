@@ -90,7 +90,9 @@ function Workspace({ session }) {
       if (version !== refreshVersion.current) return;
       setAssets(assetData.assets); setRuns(runData.profile_runs);
       setSelectedId((current) => current ?? assetData.assets[0]?.id ?? null);
-      setProfileId((current) => current ?? runData.profile_runs[0]?.id ?? null);
+      // The list holds the ten newest runs. A selected run that leaves it is replaced by the newest,
+      // so the dropdown, the detail request, the chart and the download always name the same run.
+      setProfileId((current) => runData.profile_runs.some((run) => run.id === current) ? current : runData.profile_runs[0]?.id ?? null);
     } catch (failure) { if (version === refreshVersion.current) setError(failure.message); }
   }, [session.user]);
   const refreshDetail = useCallback(async () => {

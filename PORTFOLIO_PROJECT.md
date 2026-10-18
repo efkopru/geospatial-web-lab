@@ -224,7 +224,7 @@ The source repository was private while this document was first prepared and was
 
 ## 6. Maintainer evidence references
 
-Original application source baseline: `4d231e37b75754b206398ffcee371c1479913b9e`. The October 1 refresh covers the work merged afterwards: backup restore, storage limits, record-level standalone storage, container CI and benchmarks. Its standalone test counts were rerun locally; full-stack counts come from the dated records and CI. The October 6 update takes the full-stack counts from the merged-state record of October 5 in [VERIFICATION.md](VERIFICATION.md#merged-state-october-5-2026); all 13 browser scenarios passed in the [full-stack CI run on `main` at 146f111](https://github.com/efkopru/geospatial-web-lab/actions/runs/37396612166). Repository visibility and the successful standalone CI run were checked while preparing this document.
+Original application source baseline: `fdee951a948d64ee0298b0904a626e6042b4504d`. The October 1 refresh covers the work merged afterwards: backup restore, storage limits, record-level standalone storage, container CI and benchmarks. Its standalone test counts were rerun locally; full-stack counts come from the dated records and CI. The October 6 update takes the full-stack counts from the merged-state record of October 5 in [VERIFICATION.md](VERIFICATION.md#merged-state-october-5-2026); all 13 browser scenarios passed in the [full-stack CI run on `main` at f4eb28b](https://github.com/efkopru/geospatial-web-lab/actions/runs/37396612166). Repository visibility and the successful standalone CI run were checked while preparing this document.
 
 | Reference | What it supports |
 | --- | --- |

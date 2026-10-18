@@ -21,7 +21,7 @@ function previewViewport(collection) {
 // its summary changes. While it validates, progress changes every ten features; its records
 // are then fetched at most every five seconds.
 const DETAIL_INTERVAL_WHILE_VALIDATING = 5000;
-const detailSignature = dataset => [dataset.status, dataset.processed_count, dataset.valid_count, dataset.invalid_count, dataset.updated_at, dataset.version?.id].join('|');
+const detailSignature = dataset => [dataset.status, dataset.abandoned, dataset.processed_count, dataset.valid_count, dataset.invalid_count, dataset.updated_at, dataset.version?.id].join('|');
 function needsDetail(loaded, summary) {
   if (loaded?.id !== summary.id) return true;
   if (loaded.signature === detailSignature(summary)) return false;
@@ -63,7 +63,11 @@ function Workspace({ session }) {
     const userId = session.user.id;
     const listSequence = ++listRequest.current;
     try {
-      const result = await api('/datasets');
+      // The library holds the newest 100 datasets; the open one is requested as well so that an older
+      // dataset, for example one reopened by uploading it again, stays selected. The ref holds the
+      // selection made since this callback was created.
+      const open = activeSelection.current;
+      const result = await api(open ? `/datasets?selected=${open}` : '/datasets');
       if (activeUser.current !== userId || listSequence !== listRequest.current) return;
       setDatasets(result.datasets);
       setSelectedId(current => result.datasets.some(dataset => dataset.id === current) ? current : result.datasets[0]?.id ?? null);
@@ -189,10 +193,10 @@ function Workspace({ session }) {
           <div className="panel">
             <div className="toolbar"><div><h2>{active.name}</h2><span className="badge">{statusLabel[active.status]}</span></div>
               {active.status === 'approved' && <a className="button" style={{ display: 'inline-flex', alignItems: 'center', padding: '11px 16px', borderRadius: 6, background: '#0d9488', color: '#fff', textDecoration: 'none', fontWeight: 600 }} href={`/api/datasets/${active.id}/export`} download>Download approved GeoJSON</a>}
-              {active.status === 'failed' && <button className="button" disabled={busy} onClick={() => run(() => api(`/datasets/${active.id}/retry`, { method: 'POST' }))}>Retry validation</button>}
+              {(active.status === 'failed' || active.abandoned) && <button className="button" disabled={busy} onClick={() => run(() => api(`/datasets/${active.id}/retry`, { method: 'POST' }))}>{active.abandoned ? 'Resume validation' : 'Retry validation'}</button>}
             </div>
             <p>Required attributes: <strong>{active.required_attributes.length ? active.required_attributes.join(', ') : 'none'}</strong></p>
-            {['queued', 'validating'].includes(active.status) && <div role="status"><p>{active.processed_count} of {active.total_count} features processed. Updates arrive automatically.</p><progress style={{ width: '100%' }} value={active.processed_count} max={active.total_count} /></div>}
+            {['queued', 'validating'].includes(active.status) && <div role="status"><p>{active.processed_count} of {active.total_count} features processed. {active.abandoned ? 'Validation stopped before it finished. Resume it to continue; checked records are kept.' : 'Updates arrive automatically.'}</p><progress style={{ width: '100%' }} value={active.processed_count} max={active.total_count} /></div>}
             {active.failure_message && <div className="notice">{active.failure_message}</div>}
             <div className="grid-two">
               <BarChart items={[{ label: 'Accepted', value: active.valid_count }, { label: 'Rejected', value: active.invalid_count }]} color="#0d9488" />

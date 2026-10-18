@@ -7,7 +7,7 @@ class ImportIssuesJob < ApplicationJob
 
   def perform(run_id)
     ActiveRecord::Base.connection_pool.with_connection do |connection|
-      locked = connection.select_value("SELECT pg_try_advisory_lock(10101, #{Integer(run_id)})")
+      locked = connection.select_value("SELECT pg_try_advisory_lock(#{ImportRun::ADVISORY_LOCK_KEY}, #{Integer(run_id)})")
       return unless locked
       begin
         run = ImportRun.find(run_id)
@@ -42,7 +42,7 @@ class ImportIssuesJob < ApplicationJob
         run&.update!(status: 'failed', failure: 'Import processing stopped unexpectedly. Retry processing; already imported rows will be reused.')
         raise
       ensure
-        connection.execute("SELECT pg_advisory_unlock(10101, #{Integer(run_id)})")
+        connection.execute("SELECT pg_advisory_unlock(#{ImportRun::ADVISORY_LOCK_KEY}, #{Integer(run_id)})")
       end
     end
   end
