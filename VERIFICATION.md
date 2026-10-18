@@ -154,6 +154,23 @@ Fixes for issues #16–#22, checked locally on the issue-fixes branch:
 - Abandoned-work recovery (#17) covers imports left `processing` and validations left `validating` with no session holding the job's advisory lock. It does not detect a job lost from the queue before a worker started it, because that is indistinguishable from one still waiting; a stuck export can be replaced by generating a new report.
 - Not run locally: the Playwright scenarios against running services and the container image builds. The CI and container workflows run both.
 
+## Profile recovery and documentation (October 17, 2026)
+
+After the issue fixes merged (#23), inspection profile runs gained the same abandoned-work recovery as imports and validations, and the docs were brought up to date.
+
+| Project | Tests | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Service requests | 34 | 265 | Passed |
+| Data quality portal | 34 | 266 | Passed |
+| Fleet monitor | 33 | 194 | Passed |
+| Parcel scenarios | 25 | 156 | Passed |
+| Infrastructure inspections | 33 | 245 | Passed |
+| Total | 159 | 1126 | No failures, errors, or skipped tests |
+
+- Root Vitest passed 58 tests across 13 files; the standalone editions passed 71 domain and storage tests and 10 interface tests. ESLint reported no problems and Brakeman no warnings.
+- The profile-run tests interrupt a run mid-build, resume it through retry and check it completes. They also hold the job's advisory lock from a second database session to confirm a live worker is neither restarted nor processed twice. Both failed against the code before the fix.
+- The full-stack CI run on `main` at 97e08fb, before this change, passed all 13 Playwright scenarios ([run 39085540292](https://github.com/efkopru/geospatial-web-lab/actions/runs/39085540292)).
+
 ## Boundaries
 
 The repository history was rewritten in October 2026 to change the commit author email; file contents are unchanged. Commit hashes in these records refer to the rewritten history.

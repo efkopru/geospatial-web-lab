@@ -139,8 +139,8 @@ The verification records report:
 
 | Edition | Recorded checks |
 | --- | --- |
-| Full-stack | Rails, frontend and browser suites: 145 Rails tests with 972 assertions and 50 frontend tests, recorded locally on October 5, 2026, and 13 browser scenarios against running services. CI runs them again on pull requests and on `main`, skipping changes limited to the standalone editions, Markdown files or `output/`. All five Docker stacks build and pass a container smoke test in CI. Benchmarks cover API latency, concurrent reads and background-job duration |
-| Standalone | 70 domain, storage and packaging tests; 10 interface tests; five static builds; a static-site check; browser checks of persistence, calculations, simulation, approvals, downloads, backup restore and storage migration |
+| Full-stack | Rails, frontend and browser suites: 159 Rails tests with 1126 assertions and 58 frontend tests, recorded locally on October 17, 2026, and 13 browser scenarios against running services. CI runs them again on pull requests and on `main`, skipping changes limited to the standalone editions, Markdown files or `output/`. All five Docker stacks build and pass a container smoke test in CI. Benchmarks cover API latency, concurrent reads and background-job duration |
+| Standalone | 71 domain, storage and packaging tests; 10 interface tests; five static builds; a static-site check; browser checks of persistence, calculations, simulation, approvals, downloads, backup restore and storage migration |
 
 Both editions' test and build pipelines run in clean Ubuntu CI checkouts. ESLint (both editions) and Brakeman (the five Rails backends) run in CI on every pull request and on `main`. These checks establish specific implemented behaviors. The benchmarks are single-machine measurements on synthetic data. They are not capacity guarantees, security certification, or evidence of operational adoption.
 
@@ -224,7 +224,7 @@ The source repository was private while this document was first prepared and was
 
 ## 6. Maintainer evidence references
 
-Original application source baseline: `fdee951a948d64ee0298b0904a626e6042b4504d`. The October 1 refresh covers the work merged afterwards: backup restore, storage limits, record-level standalone storage, container CI and benchmarks. Its standalone test counts were rerun locally; full-stack counts come from the dated records and CI. The October 6 update takes the full-stack counts from the merged-state record of October 5 in [VERIFICATION.md](VERIFICATION.md#merged-state-october-5-2026); all 13 browser scenarios passed in the [full-stack CI run on `main` at f4eb28b](https://github.com/efkopru/geospatial-web-lab/actions/runs/37396612166). Repository visibility and the successful standalone CI run were checked while preparing this document.
+Original application source baseline: `fdee951a948d64ee0298b0904a626e6042b4504d`. The October 1 refresh covers the work merged afterwards: backup restore, storage limits, record-level standalone storage, container CI and benchmarks. Its standalone test counts were rerun locally; full-stack counts come from the dated records and CI. The October 17 update takes the full-stack and standalone counts from the [October 17 record in VERIFICATION.md](VERIFICATION.md#profile-recovery-and-documentation-october-17-2026); all 13 browser scenarios passed in the [full-stack CI run on `main` at 97e08fb](https://github.com/efkopru/geospatial-web-lab/actions/runs/39085540292). Repository visibility and the successful standalone CI run were checked while preparing this document.
 
 | Reference | What it supports |
 | --- | --- |

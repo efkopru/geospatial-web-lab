@@ -52,7 +52,7 @@ The verification record is dated **2026-09-29**. These figures describe earlier 
 | Browser workflows | 13 scenarios passed against real local services |
 | Production frontend builds | All five passed |
 
-A local re-run on **2026-10-04**, after review fixes, recorded 138 backend tests (949 assertions) and 50 frontend tests passing, with ESLint and Brakeman in CI; browser workflows and container builds were left to CI.
+A local run on **2026-10-17**, after the October review and issue fixes, recorded 159 backend tests (1126 assertions), 58 root frontend tests and 81 standalone tests passing, with ESLint and Brakeman in CI; browser workflows and container builds were left to CI.
 
 Additional checks cover production eager loading, restricted-role migrations, Compose configuration, process handling, and backup restore. [VERIFICATION.md](VERIFICATION.md) records evidence boundaries; [AUDIT.md](AUDIT.md) and [AUDIT_SECOND_PASS.md](AUDIT_SECOND_PASS.md) describe corrected defects.
 

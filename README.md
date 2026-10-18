@@ -131,7 +131,7 @@ For an external deployment, provision HTTPS, set `ALLOWED_HOSTS` and `ALLOWED_OR
 
 ## Verification
 
-The application audit dated **2026-09-29** recorded 109 backend tests with 690 assertions, 44 frontend tests across 10 suites, 13 Playwright scenarios against real services, and five successful frontend builds. All five Compose configurations parsed successfully. These are recorded results, not new test runs performed while authoring the documentation. After the October 2026 review fixes, a local run of `main` at f4eb28b on **2026-10-05** recorded 145 backend tests with 972 assertions and 50 frontend tests across 11 suites; ESLint reported no errors or warnings and Brakeman no warnings. The lint, full-stack (including the Playwright scenarios), standalone, and container workflows passed on the same commit; see [VERIFICATION.md](VERIFICATION.md#review-follow-ups-october-5-2026).
+The application audit dated **2026-09-29** recorded 109 backend tests with 690 assertions, 44 frontend tests across 10 suites, 13 Playwright scenarios against real services, and five successful frontend builds. All five Compose configurations parsed successfully. These are recorded results, not new test runs performed while authoring the documentation. A local run on **2026-10-17**, after the October review fixes, the fixes for issues #16–#22 and the profile-run recovery, recorded 159 backend tests with 1126 assertions, 58 root frontend tests across 13 files, and 71 standalone domain and storage tests plus 10 interface tests; ESLint reported no problems and Brakeman no warnings. See [VERIFICATION.md](VERIFICATION.md#profile-recovery-and-documentation-october-17-2026).
 
 ```powershell
 npm test
