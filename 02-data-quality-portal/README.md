@@ -34,7 +34,7 @@ The root workspace README covers prerequisites, combined frontend builds, enviro
 - PostGIS parses each structurally valid geometry and runs `ST_IsValid`; topology errors such as self-intersection produce record-level findings. A database CHECK constraint prevents accepted records with absent or invalid geometry. No automatic repair or coordinate-system guessing occurs.
 - Required attributes are configurable, default `asset_id`. They must exist and be nonblank. Uniqueness and value-type rules are intentionally not assumed for these attributes.
 - Reporters see their own datasets. Staff see and approve all datasets. Every API route enforces session authentication; approval enforces staff permissions on the server.
-- Source content plus sorted validation rules determines the per-user import fingerprint. Jobs use a PostgreSQL advisory lock and unique `(dataset_id, ordinal)` records, so duplicate delivery and a retry cannot multiply imported rows. Worker failures leave a visible failed state and a **Retry validation** action. Active Job makes up to three attempts only for `ActiveRecord::ConnectionNotEstablished`; Sidekiq's own retries are disabled, so other failures wait for that action.
+- Source content plus sorted validation rules determines the per-user import fingerprint. Jobs use a PostgreSQL advisory lock and unique `(dataset_id, ordinal)` records, so duplicate delivery and a retry cannot multiply imported rows. Worker failures leave a visible failed state and a **Retry validation** action. Active Job makes up to three attempts only for `ActiveRecord::ConnectionNotEstablished`; Sidekiq's own retries are disabled, so other failures wait for that action. A validation left `validating` by a lost worker, with no session holding its advisory lock, is reported as abandoned; **Resume validation**, or uploading the same file again, continues it. One a worker still holds cannot be resumed.
 - Validation progress is committed every 10 records and at completion. All record writes commit individually, allowing the UI to observe processing while a job holds its advisory lock.
 - Approval locks the dataset row, creates a single version, and changes status atomically. Repeated approval returns the existing version. Approved exports use the immutable snapshot, never a live query over mutable record rows.
 
@@ -44,10 +44,10 @@ All paths below start with `/api`. Mutation requests require the session CSRF to
 
 | Method | Path | Result |
 |---|---|---|
-| GET | `/datasets` | Up to 100 accessible dataset summaries, newest first |
+| GET | `/datasets` | Up to 100 accessible dataset summaries, newest first; `?selected=<id>` also lists that dataset when it is older and accessible |
 | POST | `/datasets` | Upload `{name, source, required_attributes}` and queue validation |
 | GET | `/datasets/:id` | Progress, record errors, accepted map preview, version metadata |
-| POST | `/datasets/:id/retry` | Queue a failed dataset again |
+| POST | `/datasets/:id/retry` | Queue a failed dataset again, or resume one a lost worker abandoned |
 | POST | `/datasets/:id/approve` | Staff approval; `{acknowledge_rejected: true}` required when excluding rejects |
 | GET | `/datasets/:id/export` | Approved GeoJSON attachment plus `X-Content-SHA256` header |
 

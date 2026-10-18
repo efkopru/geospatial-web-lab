@@ -8,7 +8,7 @@ Full-stack Rails and React application for a synthetic foothills utility corrido
 - Compare base elevation, structure height, and top elevation. A visual exaggeration control scales vertical differences in the scene without modifying stored measurements. Labels retain real synthetic input dimensions.
 - Report an observation with severity and notes. Rails assigns the signed-in author and records an initial audit event. Staff can resolve or reopen observations with meaningful notes; optimistic locking prevents stale edits from silently overwriting changes.
 - Review the complete report/resolve/reopen chronology. Asset colors and counts reflect unresolved observations, with critical observations highlighted separately.
-- Queue profile preprocessing from the UI, watch pending/processing/completed/failed states, retry failures, inspect the result chart and sample table, and download the completed profile as GeoJSON.
+- Queue profile preprocessing from the UI, watch pending/processing/completed/failed states, retry failures, resume runs a lost worker abandoned, inspect the result chart and sample table, and download the completed profile as GeoJSON.
 - Live Action Cable invalidation reloads asset and inspection data in other sessions. A polling fallback and reconnect refresh recover current state.
 
 ## Run
@@ -47,7 +47,7 @@ All domain routes require a session. Include the session CSRF token as `X-CSRF-T
 | `GET /api/profile_runs` | Ten newest preprocessing runs | Signed in |
 | `POST /api/profile_runs` | Snapshot assets and queue profile processing | Signed in |
 | `GET /api/profile_runs/:id` | Job state, source snapshot, and samples | Signed in |
-| `POST /api/profile_runs/:id/retry` | Retry a failed run with a new generation | Signed in |
+| `POST /api/profile_runs/:id/retry` | Retry a failed run, or resume one a lost worker abandoned, with a new generation | Signed in |
 | `GET /api/profile_runs/:id/download` | Completed synthetic GeoJSON profile | Signed in |
 | `/cable`, `InspectionChannel` | `inspection.updated` and `profile.updated` invalidations | Signed in |
 

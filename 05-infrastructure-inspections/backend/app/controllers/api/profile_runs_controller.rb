@@ -22,7 +22,10 @@ module Api
     def retry
       run = ProfileRun.find(params[:id])
       run.with_lock do
-        return render(json: { error: "Only failed runs can be retried" }, status: :conflict) unless run.status == "failed"
+        unless run.status == "failed" || run.abandoned?
+          message = run.status == "processing" ? "This profile run is still being processed" : "Only failed or abandoned runs can be retried"
+          return render(json: { error: message }, status: :conflict)
+        end
         run.update!(status: "pending", generation: run.generation + 1, error_message: nil, completed_at: nil)
       end
       enqueue(run)

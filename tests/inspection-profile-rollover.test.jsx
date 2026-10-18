@@ -56,3 +56,19 @@ it('keeps a selected run that is still in the list across a refresh', async () =
   expect(screen.getByLabelText('Profile run')).toHaveValue('5');
   expect(screen.getByRole('link', { name: 'Download profile GeoJSON' })).toHaveAttribute('href', '/api/profile_runs/5/download');
 });
+
+it('offers to resume a profile run its worker abandoned and allows generating a new one', async () => {
+  const stalled = { ...run(3), status: 'processing', abandoned: true, summary: {}, completed_at: null };
+  shared.api.mockImplementation(async (path, options) => {
+    if (options?.method === 'POST') return { profile_run: { ...stalled, status: 'pending', abandoned: false, generation: 2 } };
+    if (path === '/api/assets') return { assets: [] };
+    if (path === '/api/profile_runs') return { profile_runs: [stalled, run(2), run(1)] };
+    return { profile_run: stalled, samples: [], assets: [] };
+  });
+  render(<App />);
+  const resume = await screen.findByRole('button', { name: 'Resume preprocessing' });
+  expect(screen.getByText('Processing stopped before it finished. Resume it to continue.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Generate profile' })).toBeEnabled();
+  fireEvent.click(resume);
+  await waitFor(() => expect(shared.api).toHaveBeenCalledWith('/api/profile_runs/3/retry', { method: 'POST', body: {} }));
+});

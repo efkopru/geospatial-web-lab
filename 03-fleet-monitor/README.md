@@ -10,7 +10,7 @@ Rails, React, PostGIS, Sidekiq, Redis, and Action Cable application for explorin
 - Selecting a vehicle in the list or map shows its planned route, recent recorded trail, latest position, sequence, speed chart, and zone membership.
 - PostGIS `ST_Covers` treats polygon boundaries as inside. One entry/exit event is recorded per membership transition; repeated positions do not create repeated events.
 - Staff adds rectangular geofences in the UI. The API also accepts arbitrary valid closed polygon rings. Invalid, intersecting, degenerate, or out-of-range polygons are rejected.
-- Manual telemetry is accepted through the API while replay is paused. Duplicate and out-of-order sequence numbers are ignored without mutating current state. Resumed replay continues above the accepted sequence.
+- Manual telemetry is accepted through the API while replay is paused. Duplicate and out-of-order sequence numbers are ignored without mutating current state. Resumed replay continues above the accepted sequence. Manual sequences range from 0 to 2,146,483,647, which leaves the replay at least a million further sequence numbers; a replay whose next frame would exceed 2,147,483,647 stops and must be reset.
 - Observer accounts can inspect fleet data, but Rails enforces staff permissions for replay, manual telemetry, and zone modifications.
 
 ## Run
@@ -37,7 +37,7 @@ All domain routes require a session. Send the session CSRF token as `X-CSRF-Toke
 | `GET /api/fleet` | Current control state, vehicles, zones, newest 100 events | Signed in |
 | `POST /api/fleet/control` | `{action_name: "start" \| "pause" \| "reset" \| "speed", speed: 1 \| 2 \| 4}` | Staff |
 | `GET /api/vehicles/:id/history` | Vehicle details, planned route, newest 360 recorded points | Signed in |
-| `POST /api/vehicles/:id/telemetry` | `{sequence, longitude, latitude, speed_kph}`; paused replay only | Staff |
+| `POST /api/vehicles/:id/telemetry` | `{sequence, longitude, latitude, speed_kph}`; sequence 0 to 2,146,483,647; paused replay only | Staff |
 | `POST /api/geofences` | `{geofence: {name, color, coordinates: [[longitude,latitude], …]}}` | Staff |
 | `DELETE /api/geofences/:id` | Removes zone and associated memberships/events | Staff |
 | `/cable`, `ReplayChannel` | `fleet.updated` invalidation events | Signed in |
