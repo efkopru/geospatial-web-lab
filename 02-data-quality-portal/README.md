@@ -28,7 +28,7 @@ The root workspace README covers prerequisites, combined frontend builds, enviro
 
 ## Contract and validation rules
 
-- Input is a GeoJSON `FeatureCollection`, 1 to 2,000 features, maximum 5 MB. Upload uses a JSON request with a `source` string, rather than multipart form storage.
+- Input is a GeoJSON `FeatureCollection`, 1 to 2,000 features, maximum 5 MB. Upload uses a JSON request with a `source` string, rather than multipart form storage. The source an account stores is capped at 50 MB of compact JSON (`source_bytes`); uploading a dataset stored before still reopens it.
 - Accepted geometry types: Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon. GeometryCollection, null geometry, empty components, and 3D positions are rejected explicitly.
 - Coordinates must be exactly two finite numbers in longitude, latitude order, using WGS84/EPSG:4326. Longitude must be in [-180, 180], latitude in [-90, 90]. Polygon rings must close and contain at least four positions.
 - PostGIS parses each structurally valid geometry and runs `ST_IsValid`; topology errors such as self-intersection produce record-level findings. A database CHECK constraint prevents accepted records with absent or invalid geometry. No automatic repair or coordinate-system guessing occurs.
