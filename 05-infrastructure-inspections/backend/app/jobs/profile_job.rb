@@ -29,7 +29,7 @@ class ProfileJob < ApplicationJob
       result = CorridorProfile.build(run.asset_snapshot)
       run.update!(status: "completed", samples: result[:samples], summary: result[:summary], completed_at: Time.current)
     end
-    ProfileRun.prune_completed!
+    ProfileRun.prune_completed!(user_id: run.user_id)
     broadcast(run)
   rescue StandardError => error
     if run&.persisted?
@@ -42,7 +42,9 @@ class ProfileJob < ApplicationJob
   end
 
   def broadcast(run)
-    ActionCable.server.broadcast("infrastructure_inspections", { type: "profile.updated", id: run.id, status: run.status })
+    return if run.user_id.nil?
+
+    ActionCable.server.broadcast("infrastructure_profiles_#{run.user_id}", { type: "profile.updated", id: run.id, status: run.status })
   rescue StandardError => error
     Rails.logger.warn("Profile notification failed: #{error.class}: #{error.message}")
   end

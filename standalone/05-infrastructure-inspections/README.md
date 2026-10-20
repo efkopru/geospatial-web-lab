@@ -14,7 +14,7 @@ Follow the [suite setup instructions](../README.md). From `standalone`, `npm run
 - Use a staff demo role to resolve or reopen observations with explanatory notes. Every change appends an actor, action and timestamp to the local history.
 - Reject stale status changes using a version number. A form opened before another accepted edit must reload before it can write again.
 - Generate an actual 71-point corridor profile in the browser, inspect its chart and sample table, and download its GeoJSON.
-- Review the ten most recent profile runs. The browser keeps the newest 20 completed runs and removes older completed runs. Failed or pending runs are kept so they can be retried. A tab that still shows a removed run reports that it was not found. Completed runs preserve the source asset snapshot and remain independent of subsequent observations or source changes.
+- Review the selected demo identity's ten most recent profile runs. The browser keeps that identity's newest 20 completed runs and removes its older completed runs. Failed or pending runs are kept so they can be retried. Another identity's history remains unchanged. A tab that still shows a removed run reports that it was not found. Completed runs preserve the source asset snapshot and remain independent of subsequent observations or source changes.
 - Export or restore a browser backup, or reset the demo from the shared controls.
 
 ## Profile mathematics
@@ -29,7 +29,7 @@ The calculation uses a spherical approximation rather than the original PostGIS 
 
 Profile generation runs immediately in the browser. It does not queue work on a server or continue after the browser closes. Retry handling is available for a failed local run, but normal valid synthetic profiles finish during their creation action.
 
-Observations and profile runs are shared among the three demo users within this app's browser store, matching the shared asset-register workflow. Only staff demo roles can change observation status. This is role simulation, not authentication: anyone controlling the browser can inspect or modify its storage. The original full-stack app retains server authorization and database audit controls.
+Observations and assets are shared among the three demo users within this app's browser store. Profile lists, details, downloads, retries, and retention follow the selected demo identity; staff demo roles do not gain access to another identity's profiles. Only staff demo roles can change observation status. This is role simulation, not authentication: anyone controlling the browser can inspect or modify its storage, and a browser backup contains the entire app store. The original full-stack app enforces profile ownership on the server.
 
 The Cesium scene uses synthetic asset surfaces and requires WebGL. It does not require an external terrain token. Browser storage can be cleared or evicted; the shared backup export preserves an inspectable JSON archive that the shared restore control can load again. The shared runtime controls persistence, reset and browser-tab coordination.
 

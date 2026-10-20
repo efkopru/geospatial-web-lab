@@ -1,8 +1,9 @@
 import { check, oneOf, between, latitude as validLatitude, longitude as validLongitude, uniqueIds, refersTo, counterAbove } from '../../shared/backup-check.js';
 const RADIUS_M = 6371008.8;
 const INITIAL_TIME = '2026-09-29T15:00:00.000Z';
-// The workspace lists the newest 10 runs. Completed runs beyond the newest 20 are pruned so each
-// save stays small; failed or pending runs are kept so they can still be retried.
+// Each demo identity lists its newest 10 runs and keeps its newest 20 completed runs.
+// Other identities' runs and unfinished runs are preserved. This is workflow simulation,
+// not a security boundary: every record still resides in the same browser database.
 export const PROFILE_RUN_LIMIT = 20;
 const PROFILE_SOURCE = 'Synthetic base elevations; linear elevation interpolation along spherical great-circle segments (mean radius 6371008.8 m); not a DEM or PostGIS ellipsoidal calculation';
 const round = (value, places = 2) => Number(value.toFixed(places));
@@ -98,6 +99,14 @@ function validNotes(value, fail) {
   return notes;
 }
 
+function pruneCompletedProfiles(state, userId) {
+  const completed = state.profileRuns.filter((run) => run.user_id === userId && run.status === 'completed').sort((a, b) => a.id - b.id);
+  if (completed.length > PROFILE_RUN_LIMIT) {
+    const pruned = new Set(completed.slice(0, completed.length - PROFILE_RUN_LIMIT).map((run) => run.id));
+    state.profileRuns = state.profileRuns.filter((run) => !pruned.has(run.id));
+  }
+}
+
 export function handle({ path, method = 'GET', body = {} }, context) {
   const { state, user, users, now, fail, requireStaff } = context;
   if (!user) fail('Choose a demo user first', 401);
@@ -132,22 +141,18 @@ export function handle({ path, method = 'GET', body = {} }, context) {
     inspection.events.push({ id: state.nextEventId++, actor_id: user.id, action: attributes.status === 'resolved' ? 'resolved' : 'reopened', notes, created_at: timestamp });
     return { inspection: inspectionPayload(inspection, users) };
   }
-  if (path === '/api/profile_runs' && method === 'GET') return { profile_runs: [...state.profileRuns].sort((a, b) => b.id - a.id).slice(0, 10).map(profilePayload) };
+  if (path === '/api/profile_runs' && method === 'GET') return { profile_runs: state.profileRuns.filter((run) => run.user_id === user.id).sort((a, b) => b.id - a.id).slice(0, 10).map(profilePayload) };
   if (path === '/api/profile_runs' && method === 'POST') {
     const assets = JSON.parse(JSON.stringify(state.assets)).sort((a, b) => a.corridor_order - b.corridor_order || a.id - b.id);
     const result = buildProfile(assets), timestamp = now();
     const run = { id: state.nextProfileId++, user_id: user.id, status: 'completed', generation: 1, created_at: timestamp, completed_at: timestamp, error_message: null, asset_snapshot: assets, ...result };
     state.profileRuns.push(run);
-    const completed = state.profileRuns.filter((entry) => entry.status === 'completed');
-    if (completed.length > PROFILE_RUN_LIMIT) {
-      const pruned = new Set(completed.slice(0, completed.length - PROFILE_RUN_LIMIT).map((entry) => entry.id));
-      state.profileRuns = state.profileRuns.filter((entry) => !pruned.has(entry.id));
-    }
+    pruneCompletedProfiles(state, user.id);
     return { profile_run: profilePayload(run) };
   }
   match = path.match(/^\/api\/profile_runs\/(\d+)(?:\/(download|retry))?$/);
   if (match) {
-    const run = state.profileRuns.find((entry) => entry.id === Number(match[1]));
+    const run = state.profileRuns.find((entry) => entry.id === Number(match[1]) && entry.user_id === user.id);
     if (!run) fail('Profile run not found', 404);
     if (!match[2] && method === 'GET') return { profile_run: profilePayload(run), samples: run.samples, assets: run.asset_snapshot };
     if (match[2] === 'download' && method === 'GET') {
@@ -157,6 +162,7 @@ export function handle({ path, method = 'GET', body = {} }, context) {
     if (match[2] === 'retry' && method === 'POST') {
       if (run.status !== 'failed') fail('Only failed profile runs can be retried', 409);
       Object.assign(run, buildProfile(run.asset_snapshot), { status: 'completed', generation: run.generation + 1, completed_at: now(), error_message: null });
+      pruneCompletedProfiles(state, user.id);
       return { profile_run: profilePayload(run) };
     }
   }

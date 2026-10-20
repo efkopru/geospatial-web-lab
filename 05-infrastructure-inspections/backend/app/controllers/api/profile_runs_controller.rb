@@ -3,11 +3,11 @@ module Api
     before_action :require_user!
 
     def index
-      render json: { profile_runs: ProfileRun.order(id: :desc).limit(10).map(&:payload) }
+      render json: { profile_runs: owned_runs.order(id: :desc).limit(10).map(&:payload) }
     end
 
     def show
-      run = ProfileRun.find(params[:id])
+      run = owned_runs.find(params[:id])
       render json: { profile_run: run.payload, samples: run.samples, assets: run.asset_snapshot }
     end
 
@@ -20,7 +20,7 @@ module Api
     end
 
     def retry
-      run = ProfileRun.find(params[:id])
+      run = owned_runs.find(params[:id])
       run.with_lock do
         unless run.status == "failed" || run.abandoned?
           message = run.status == "processing" ? "This profile run is still being processed" : "Only failed or abandoned runs can be retried"
@@ -33,12 +33,16 @@ module Api
     end
 
     def download
-      run = ProfileRun.find(params[:id])
+      run = owned_runs.find(params[:id])
       return render(json: { error: "Profile is not complete" }, status: :conflict) unless run.status == "completed"
       send_data JSON.pretty_generate(run.document), filename: "synthetic-corridor-profile-#{run.id}.geojson", type: "application/geo+json", disposition: "attachment"
     end
 
     private
+
+    def owned_runs
+      ProfileRun.where(user_id: current_user.id)
+    end
 
     def enqueue(run)
       generation = run.generation
