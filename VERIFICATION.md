@@ -171,6 +171,24 @@ After the issue fixes merged (#23), inspection profile runs gained the same aban
 - The profile-run tests interrupt a run mid-build, resume it through retry and check it completes. They also hold the job's advisory lock from a second database session to confirm a live worker is neither restarted nor processed twice. Both failed against the code before the fix.
 - The full-stack CI run on `main` at 97e08fb, before this change, passed all 13 Playwright scenarios ([run 39085540292](https://github.com/efkopru/geospatial-web-lab/actions/runs/39085540292)).
 
+## Storage limits (October 17, 2026)
+
+The full-stack apps gained per-account storage limits that mirror the standalone edition, and HOW_TO_USE gained troubleshooting for stuck scenarios and exports.
+
+| Project | Tests | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Service requests | 36 | 280 | Passed |
+| Data quality portal | 35 | 277 | Passed |
+| Fleet monitor | 33 | 194 | Passed |
+| Parcel scenarios | 26 | 162 | Passed |
+| Infrastructure inspections | 34 | 249 | Passed |
+| Total | 164 | 1162 | No failures, errors, or skipped tests |
+
+- New tests cover the 100-import cap (a known file still reopens its run), keeping the newest 30 export reports without removing unfinished ones or other accounts' reports, the 50 MB stored-source budget per account (re-uploads still reopen, other accounts unaffected), the 1,000-scenario cap and its release after a delete, and keeping the newest 20 completed profile runs without removing failed ones. Each failed against the code before the change.
+- Migration 011 (`datasets.source_bytes`) was rolled back and re-applied on the test database with an existing dataset; the backfill recorded its compact JSON size.
+- Root Vitest passed 58 tests across 13 files; the standalone editions passed 71 domain and storage tests and 10 interface tests. ESLint reported no problems and Brakeman no warnings; all five builds passed.
+- The data quality budget is 50 MB rather than the standalone edition's 10 MB because the full benchmark uploads 19.5 MB of datasets from one account.
+
 ## Boundaries
 
 The repository history was rewritten in October 2026 to change the commit author email; file contents are unchanged. Commit hashes in these records refer to the rewritten history.

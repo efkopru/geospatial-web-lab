@@ -3,6 +3,8 @@ class ImportRun < ApplicationRecord
   validates :digest, uniqueness: { scope: :requested_by_id }
   validates :status, inclusion: { in: %w[pending processing completed failed] }
   after_commit :broadcast_change
+  # Each run keeps its uploaded GeoJSON (up to 2 MB) for retries, so an account may hold this many.
+  MAX_PER_USER = 100
   # First key of the session advisory lock ImportIssuesJob holds while it runs; the run id is the second.
   ADVISORY_LOCK_KEY = 10101
 

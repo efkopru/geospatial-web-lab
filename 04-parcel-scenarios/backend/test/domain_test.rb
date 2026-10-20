@@ -69,6 +69,21 @@ class ScenarioApiTest < ActionDispatch::IntegrationTest
   get "/api/scenarios/#{scenarios.first.id}/export"
   assert_equal parcel.id,JSON.parse(response.body).dig('results','parcel_snapshot',0,'id')
  end
+ test 'an account may save 1000 scenarios and can save again after deleting one' do
+  user=User.create!(email:'quota@test.local',name:'Quota',password:'Learning123!',role:'staff')
+  parcel=Parcel.create!(name:'Quota block',district:'Test',boundary:{type:'Polygon',coordinates:[[[0,0],[0.01,0],[0.01,0.01],[0,0.01],[0,0]]]})
+  now=Time.current
+  Scenario.insert_all(Scenario::MAX_PER_USER.times.map { |i| {user_id:user.id,name:"Saved #{i}",parcel_ids:[parcel.id],floors:2,coverage:0.5,unit_area:900,status:'complete',created_at:now,updated_at:now} })
+  post '/api/session',params:{email:user.email,password:'Learning123!'},as: :json
+  attributes={name:'One more',parcel_ids:[parcel.id],floors:2,coverage:0.5,unit_area:900}
+  assert_no_difference('Scenario.count') { post '/api/scenarios',params:{scenario:attributes},as: :json }
+  assert_response :unprocessable_entity
+  assert_equal 'You have 1000 saved scenarios, the limit for one account. Delete scenarios you no longer need, then save again.',response.parsed_body['error']
+  delete "/api/scenarios/#{Scenario.where(user_id:user.id).minimum(:id)}"
+  assert_response :no_content
+  post '/api/scenarios',params:{scenario:attributes},as: :json
+  assert_response :created
+ end
  test 'a failed calculation is retried from the app, not by Sidekiq' do
   assert_equal false,CalculateScenarioJob.get_sidekiq_options['retry']
  end

@@ -131,7 +131,7 @@ Failed sign-ins are limited: five for one email, or twenty from one address, wit
 5. As staff, open **Imports & reports**. Choose **Download example**, then upload the downloaded GeoJSON. Review progress and **Review rejected rows** when present. Uploading the same content again reuses the existing owned import.
 6. Choose **Generate CSV report**, wait for `completed`, then **Download CSV**. The report contains all requests, regardless of current map filters, and is downloadable only by its requesting staff account.
 
-Imports accept 1 to 500 Point features under the 2 MB limit. Each needs a `title`; supported categories are `roads`, `lighting`, `drainage`, and `parks`, with `roads` as the default. Valid rows continue when other rows fail validation. Correct bad source rows and submit a new upload. **Retry import** is for a failed processing run, not for repairing invalid records. The map/register shows at most 500 matching requests while summary counts cover all matches.
+Imports accept 1 to 500 Point features under the 2 MB limit. Each needs a `title`; supported categories are `roads`, `lighting`, `drainage`, and `parks`, with `roads` as the default. Valid rows continue when other rows fail validation. Correct bad source rows and submit a new upload. **Retry import** is for a failed processing run, not for repairing invalid records. The map/register shows at most 500 matching requests while summary counts cover all matches. An account may hold 100 imports; uploading a file you imported before still reopens its import. Only your newest 30 CSV reports are kept.
 
 ### Data quality portal
 
@@ -141,7 +141,7 @@ Imports accept 1 to 500 Point features under the 2 MB limit. Each needs a `title
 4. In a separate staff session, select the dataset. Choose **Approve valid features**. For a mixed dataset, first acknowledge that rejected features will be excluded. A dataset with no accepted features cannot be approved.
 5. Choose **Download approved GeoJSON**. The recorded version includes a feature count and SHA-256 digest. Corrected inputs require a new upload; the approved snapshot remains unchanged.
 
-Files are limited to 2,000 features and 5 MB. Supported geometries are Point, MultiPoint, LineString, MultiLineString, Polygon, and MultiPolygon. Coordinates must contain exactly two finite numbers in longitude, latitude order in WGS84. Three-dimensional positions, GeometryCollection, empty/null geometry, invalid rings, and invalid topology are rejected. No automatic geometry repair or coordinate-system guessing occurs. Reporters see their own datasets; staff see all datasets and control approval. **Retry validation** appears for processing failures.
+Files are limited to 2,000 features and 5 MB. Supported geometries are Point, MultiPoint, LineString, MultiLineString, Polygon, and MultiPolygon. Coordinates must contain exactly two finite numbers in longitude, latitude order in WGS84. Three-dimensional positions, GeometryCollection, empty/null geometry, invalid rings, and invalid topology are rejected. No automatic geometry repair or coordinate-system guessing occurs. Reporters see their own datasets; staff see all datasets and control approval. **Retry validation** appears for processing failures. The GeoJSON an account stores is limited to 50 MB, measured as compact JSON; uploading a dataset you stored before still reopens it.
 
 ### Fleet monitor
 
@@ -159,7 +159,7 @@ Files are limited to 2,000 features and 5 MB. Supported geometries are Point, Mu
 2. Choose a **District**, then select parcels on the map or table. **Select visible** selects every parcel in the currently filtered table, not only parcels inside the map viewport. Use **Clear selection** before changing study areas if prior selections should be removed.
 3. Enter a **Scenario name**, **Floors**, **Unit area (sq ft)**, and **Building coverage**. For a first comparison, use 4 floors, 900 square feet per unit, and 40% coverage. Choose **Calculate ... selected parcels**.
 4. Wait for state `complete`. Save another named scenario with different assumptions. Select up to four completed rows to compare estimated units and open space.
-5. Choose **Export** to download the calculation, original parcel geometry, and assumptions. Use **Retry** only for a failed scenario. Save a new scenario for changed assumptions; completed calculations are preserved. **Delete** removes the selected saved scenario.
+5. Choose **Export** to download the calculation, original parcel geometry, and assumptions. Use **Retry** only for a failed scenario. Save a new scenario for changed assumptions; completed calculations are preserved. **Delete** removes the selected saved scenario. An account may save 1,000 scenarios; delete some to save more.
 
 Inputs allow 1 to 30 floors, 5% to 80% coverage, and unit areas from 400 to 3,000 square feet. Gross area equals site area multiplied by coverage and floors. Residential area uses an 80% efficiency assumption, and estimated units round down. Synthetic height limits produce warnings. These outputs are planning exercises, not permit, engineering, or financial determinations.
 
@@ -169,7 +169,7 @@ Inputs allow 1 to 30 floors, 5% to 80% coverage, and unit areas from 400 to 3,00
 2. Change **Height display** between actual scale, 3x, and 5x. Compare base elevation, structure height, and top elevation. Exaggeration changes the drawing only; stored and exported measurements remain unchanged.
 3. As the reporter, choose **Add observation**, select severity, enter 10 to 2,000 characters in **Observation notes**, and **Save observation**.
 4. In a staff session, choose **Resolve observation**, supply resolution notes, then **Save status change**. Review **History**. Staff can **Reopen observation** with a reason. If another user changes an open draft, cancel and reopen the form before saving.
-5. Choose **Generate profile**. Wait for `completed`, inspect the chart and **Profile samples**, then **Download profile GeoJSON**. A failed run exposes **Retry preprocessing**.
+5. Choose **Generate profile**. Wait for `completed`, inspect the chart and **Profile samples**, then **Download profile GeoJSON**. A failed run exposes **Retry preprocessing**. Only the newest 20 completed runs are kept; older completed runs are removed when a new run completes.
 
 The profile snapshots source asset values and linearly interpolates synthetic base elevations, using PostGIS geography distances. Eight seeded assets produce 71 samples. The corridor surface is not a measured DEM or clearance assessment. Registers and observation forms remain usable if the 3D renderer cannot initialize.
 
@@ -242,6 +242,9 @@ For the default local WSL arrangement, `sudo bash scripts/verify-backup.sh` chec
 | Jobs remain queued | Check Redis and the project's worker. Inspect `.runtime/<project>-worker.log` for combined launches. |
 | A run shows failed | A service-request import or export can show failed between automatic attempts. Active Job allows three total attempts, with retry delays starting at 3 and 18 seconds plus jitter and queue time. Validation allows three attempts only for `ActiveRecord::ConnectionNotEstablished`. Additional Sidekiq retries are disabled for imports, exports, validation, and scenarios; scenario calculations require manual retry. Profile errors recorded as failed require manual recovery, but errors escaping the failure handler can still trigger Sidekiq retries. If a run stays failed, fix the cause, then use **Retry import**, **Retry validation**, **Retry**, or **Retry preprocessing**; for a failed export, choose **Generate CSV report** again. |
 | An import, validation or profile run stays processing | If its worker process was lost, the app marks it abandoned and shows **Resume import**, **Resume validation** or **Resume preprocessing**. A run a worker is still processing cannot be resumed. |
+| A scenario stays queued | If the worker is running, the calculation job was lost before it started. Queued scenarios cannot be retried; delete the scenario and save it again. |
+| An export stays processing | Generate a new report with **Generate CSV report**. The stuck entry drops out of the recent-reports list as newer reports are added. |
+| An upload or save is refused for an account limit | The message names the limit: 100 imports, 50 MB of stored datasets, or 1,000 saved scenarios per account. Delete scenarios to save more; imports and datasets cannot be deleted in the app. |
 | Replay shows running but vehicles do not move | The worker running the replay may have stopped. Check the worker, then choose **Pause** and **Start replay**. |
 | Sign-in says "Too many failed sign-in attempts" | Wait 15 minutes, or clear the counts in that backend with `bundle exec rails runner 'Rails.cache.clear'` (in Compose: `docker compose exec api bundle exec rails runner 'Rails.cache.clear'`). |
 | API fails during startup | Inspect `.runtime/<project>-api.log`; check PostgreSQL, credentials, and migrations. |

@@ -22,6 +22,7 @@ Calculation: site square feet × coverage × floors = gross floor area. 80% of g
 - `GET /api/parcels?district=...&bbox=west,south,east,north`
 - `GET/POST /api/scenarios`, `GET/DELETE /api/scenarios/:id`
 - `POST /api/scenarios/:id/recalculate`, `GET /api/scenarios/:id/export`
+- An account may save 1,000 scenarios; saving more answers 422 until some are deleted.
 - `ScenarioChannel` streams only the authenticated user's changes.
 
 Recalculation retries failed scenarios only. Completed snapshots remain unchanged; save a new scenario for another calculation or updated parcel inputs. Queued and processing scenarios also reject retries to prevent competing revisions.

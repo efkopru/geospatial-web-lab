@@ -24,6 +24,9 @@ module Api
         return unless resume_if_abandoned(run)
         return render json: { import: run.as_payload, reused: true }, status: :ok
       end
+      if ImportRun.where(requested_by: current_user).count >= ImportRun::MAX_PER_USER
+        return render json: { error: "You have #{ImportRun::MAX_PER_USER} imports, the limit for one account. Uploading a file you imported before still reopens its import." }, status: :unprocessable_entity
+      end
       run = ImportRun.create!(requested_by: current_user, digest: digest, payload: payload)
       return unless enqueue(run)
       render json: { import: run.as_payload, reused: false }, status: :accepted

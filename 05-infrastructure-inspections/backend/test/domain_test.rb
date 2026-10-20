@@ -91,6 +91,20 @@ class InfrastructureDomainTest < ActiveSupport::TestCase
     ActionCable.server.define_singleton_method(:broadcast, original)
   end
 
+  test "completing a run keeps the newest 20 completed runs and never removes unfinished ones" do
+    snapshot = [@first.payload, @second.payload]
+    now = Time.current
+    ProfileRun.insert_all(ProfileRun::KEEP_COMPLETED.times.map { { user_id: @user.id, status: "completed", asset_snapshot: snapshot, created_at: now, updated_at: now } })
+    oldest = ProfileRun.where(status: "completed").minimum(:id)
+    failed = ProfileRun.create!(user: @user, status: "failed", asset_snapshot: snapshot, error_message: "Earlier failure")
+    run = ProfileRun.create!(user: @user, asset_snapshot: snapshot)
+    ProfileJob.perform_now(run.id, run.generation)
+    assert_equal "completed", run.reload.status
+    assert_equal ProfileRun::KEEP_COMPLETED, ProfileRun.where(status: "completed").count
+    assert_not ProfileRun.exists?(oldest)
+    assert ProfileRun.exists?(failed.id)
+  end
+
   test "bad snapshots fail visibly and old generations cannot replace a retried result" do
     run = ProfileRun.create!(user: @user, asset_snapshot: [])
     ProfileJob.perform_now(run.id, 0)

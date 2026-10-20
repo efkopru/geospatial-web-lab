@@ -8,7 +8,7 @@ Full-stack Rails and React application for a synthetic foothills utility corrido
 - Compare base elevation, structure height, and top elevation. A visual exaggeration control scales vertical differences in the scene without modifying stored measurements. Labels retain real synthetic input dimensions.
 - Report an observation with severity and notes. Rails assigns the signed-in author and records an initial audit event. Staff can resolve or reopen observations with meaningful notes; optimistic locking prevents stale edits from silently overwriting changes.
 - Review the complete report/resolve/reopen chronology. Asset colors and counts reflect unresolved observations, with critical observations highlighted separately.
-- Queue profile preprocessing from the UI, watch pending/processing/completed/failed states, retry failures, resume runs a lost worker abandoned, inspect the result chart and sample table, and download the completed profile as GeoJSON.
+- Queue profile preprocessing from the UI, watch pending/processing/completed/failed states, retry failures, resume runs a lost worker abandoned, inspect the result chart and sample table, and download the completed profile as GeoJSON. Only the newest 20 completed runs are kept; pending, processing and failed runs stay.
 - Live Action Cable invalidation reloads asset and inspection data in other sessions. A polling fallback and reconnect refresh recover current state.
 
 ## Run

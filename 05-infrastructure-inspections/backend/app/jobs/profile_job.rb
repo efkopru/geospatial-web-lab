@@ -29,6 +29,7 @@ class ProfileJob < ApplicationJob
       result = CorridorProfile.build(run.asset_snapshot)
       run.update!(status: "completed", samples: result[:samples], summary: result[:summary], completed_at: Time.current)
     end
+    ProfileRun.prune_completed!
     broadcast(run)
   rescue StandardError => error
     if run&.persisted?

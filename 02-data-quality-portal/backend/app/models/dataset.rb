@@ -3,6 +3,9 @@ require "digest"
 class Dataset < ApplicationRecord
   MAX_FEATURES = 2_000
   MAX_SOURCE_BYTES = 5.megabytes
+  # Datasets cannot be deleted and each keeps its source, records and approved export, so the
+  # stored source (compact JSON) per account is capped. The standalone edition caps a browser at 10 MB.
+  MAX_STORED_SOURCE_BYTES_PER_USER = 50.megabytes
   belongs_to :user
   has_many :dataset_records, dependent: :destroy
   has_one :dataset_version
@@ -33,8 +36,14 @@ class Dataset < ApplicationRecord
     fingerprint = Digest::SHA256.hexdigest(JSON.generate([canonical(source), attributes]))
     existing = find_by(user: user, source_digest: fingerprint)
     return [existing, false] if existing
+    source_bytes = JSON.generate(source).bytesize
+    stored_bytes = where(user: user).sum(:source_bytes)
+    if stored_bytes + source_bytes > MAX_STORED_SOURCE_BYTES_PER_USER
+      raise ArgumentError, "This #{size_text(source_bytes)} dataset would bring your stored datasets to #{size_text(stored_bytes + source_bytes)}, " \
+        "over the #{size_text(MAX_STORED_SOURCE_BYTES_PER_USER)} limit for one account (#{size_text(stored_bytes)} already stored)"
+    end
     dataset = create!(user: user, name: name, source: source, required_attributes: attributes,
-                      source_digest: fingerprint, total_count: source["features"].size)
+                      source_digest: fingerprint, total_count: source["features"].size, source_bytes: source_bytes)
     [dataset, true]
   rescue JSON::ParserError
     raise ArgumentError, "File is not valid JSON"
@@ -67,6 +76,8 @@ class Dataset < ApplicationRecord
     end
     nil
   end
+
+  def self.size_text(bytes) = bytes < 1.megabyte ? "#{(bytes / 1024.0).ceil} KB" : "#{format("%.1f", bytes / 1_048_576.0)} MB"
 
   def self.storable_text?(text)
     text.valid_encoding? && !text.include?("\u0000")
