@@ -8,7 +8,7 @@ Full-stack Rails and React application for a synthetic foothills utility corrido
 - Compare base elevation, structure height, and top elevation. A visual exaggeration control scales vertical differences in the scene without modifying stored measurements. Labels retain real synthetic input dimensions.
 - Report an observation with severity and notes. Rails assigns the signed-in author and records an initial audit event. Staff can resolve or reopen observations with meaningful notes; optimistic locking prevents stale edits from silently overwriting changes.
 - Review the complete report/resolve/reopen chronology. Asset colors and counts reflect unresolved observations, with critical observations highlighted separately.
-- Queue profile preprocessing from the UI, watch pending/processing/completed/failed states, retry failures, resume runs a lost worker abandoned, inspect the result chart and sample table, and download the completed profile as GeoJSON. Only the newest 20 completed runs are kept; pending, processing and failed runs stay.
+- Queue profile preprocessing from the UI, watch pending/processing/completed/failed states, retry failures, resume runs a lost worker abandoned, inspect the result chart and sample table, and download the completed profile as GeoJSON. Each account sees and manages only its own profile runs, including staff accounts. Only that account's newest 20 completed runs are kept; pending, processing and failed runs stay.
 - Live Action Cable invalidation reloads asset and inspection data in other sessions. A polling fallback and reconnect refresh recover current state.
 
 ## Run
@@ -44,14 +44,16 @@ All domain routes require a session. Include the session CSRF token as `X-CSRF-T
 | `GET /api/assets/:id` | Asset and inspection history | Signed in |
 | `POST /api/assets/:id/inspections` | `{inspection: {severity, notes, observed_at}}` | Signed in |
 | `PATCH /api/inspections/:id` | `{inspection: {status: "open" or "resolved", resolution_notes, lock_version}}` | Staff |
-| `GET /api/profile_runs` | Ten newest preprocessing runs | Signed in |
+| `GET /api/profile_runs` | Your ten newest preprocessing runs | Owner |
 | `POST /api/profile_runs` | Snapshot assets and queue profile processing | Signed in |
-| `GET /api/profile_runs/:id` | Job state, source snapshot, and samples | Signed in |
-| `POST /api/profile_runs/:id/retry` | Retry a failed run, or resume one a lost worker abandoned, with a new generation | Signed in |
-| `GET /api/profile_runs/:id/download` | Completed synthetic GeoJSON profile | Signed in |
-| `/cable`, `InspectionChannel` | `inspection.updated` and `profile.updated` invalidations | Signed in |
+| `GET /api/profile_runs/:id` | Job state, source snapshot, and samples | Owner |
+| `POST /api/profile_runs/:id/retry` | Retry a failed run, or resume one a lost worker abandoned, with a new generation | Owner |
+| `GET /api/profile_runs/:id/download` | Completed synthetic GeoJSON profile | Owner |
+| `/cable`, `InspectionChannel` | Shared `inspection.updated` and owner-scoped `profile.updated` invalidations | Signed in |
 
 Session routes are `GET`, `POST`, and `DELETE /api/session`. `/up` checks service health.
+
+Profile ownership does not change the shared asset registry or inspection workflow. Another account's profile IDs return not found, and finishing one account's run does not prune another account's history.
 
 ## Tests and verification
 

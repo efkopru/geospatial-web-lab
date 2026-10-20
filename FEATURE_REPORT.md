@@ -307,7 +307,7 @@ For API-oriented learning, the parcel endpoint supports a district equality filt
 
 The infrastructure application connects a small asset register, a CesiumJS scene, an observation history, and a background elevation-profile calculation. Its eight seeded poles, towers, and control cabinets represent a synthetic foothills corridor. The learning problem is to keep spatial context, measurements, field observations, staff decisions, and generated results consistent across a full application.
 
-Open the interface at `http://127.0.0.1:5175`. Both staff and reporter accounts can explore assets, report observations, and generate or download profiles. Staff alone can resolve or reopen observations. Assets, observations, and profile runs form a shared workspace for signed-in users; profiles are not restricted to their creator.
+Open the interface at `http://127.0.0.1:5175`. Both staff and reporter accounts can explore assets, report observations, and generate profiles. Staff alone can resolve or reopen observations. Assets and observations remain shared. As of October 20, 2026, profile lists, details, downloads, retries, notifications, and retention are restricted to the creating account, including for staff. Each account retains its newest 20 completed runs.
 
 ### Corridor overview and asset register
 
@@ -415,7 +415,7 @@ Mutations require Rails CSRF protection. The shared client refreshes a rotated C
 | Data quality portal | Upload and review owned datasets; download owned approved output | Review all datasets and approve valid features |
 | Fleet monitor | Observe vehicles, routes, zones, and events | Control replay and modify zones |
 | Parcel scenarios | Create, compare, export, retry, and delete own scenarios | Same ownership boundary; no access to another user's scenarios |
-| Infrastructure inspections | View shared assets and history; add observations; generate, retry, and download shared profiles | Resolve and reopen observations |
+| Infrastructure inspections | View shared assets and history; add observations; generate, retry, and download own profiles | Resolve and reopen observations; no access to another account's profiles |
 
 Backend routes and queries enforce these boundaries. Demo credentials must be replaced before external deployment.
 
@@ -457,7 +457,7 @@ Describe the repository as an **AI-assisted learning and portfolio project using
 
 Screenshots document the running interface and the state visible at capture time. They complement source review and tests; they do not independently verify every backend branch. ArcGIS basemaps and SDK assets require network access, while full map and scene rendering requires suitable browser graphics support. The Cesium corridor's runtime assets are local and its elevations are synthetic.
 
-Reproduction commands are in [HOW_TO_USE.md](HOW_TO_USE.md); dated checks and corrections are in [VERIFICATION.md](VERIFICATION.md), [AUDIT.md](AUDIT.md), and [AUDIT_SECOND_PASS.md](AUDIT_SECOND_PASS.md). Exclude credentials, backups, and private runtime logs from releases. A public repository provides neither application hosting nor a redistribution license; this repository has no license file.
+Reproduction commands are in [HOW_TO_USE.md](HOW_TO_USE.md); dated checks and corrections are in [VERIFICATION.md](VERIFICATION.md), [AUDIT.md](AUDIT.md), and [AUDIT_SECOND_PASS.md](AUDIT_SECOND_PASS.md). Exclude credentials, backups, and private runtime logs from releases. A public repository provides neither application hosting nor an additional redistribution license. Original project material is published with [all rights reserved](LICENSE); third-party material retains its own licenses and terms.
 
 ![Figure 21. Shared sign-in component, shown in Infrastructure inspections. Staff demo and Reporter demo select the seeded learning accounts. The displayed password is an intentional synthetic demo credential.](output/screenshots/feature-report/00-sign-in.jpg)
 

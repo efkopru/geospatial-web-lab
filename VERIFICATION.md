@@ -200,3 +200,15 @@ The ArcGIS basemap and SDK asset delivery need internet access. Business records
 Reproduce checks using the commands in the root README and project-specific READMEs. Startup migrates existing databases without running demo seeds. Seeding is an explicit separate action. [AUDIT.md](AUDIT.md) lists the corrected defects.
 
 The first audit recorded 94 backend tests, 36 frontend tests, and 12 browser scenarios. The figures above include the [second audit](AUDIT_SECOND_PASS.md). Its parcel concurrency test was additionally verified with the original failing random seed, 4284, after narrowing an overly broad test hook.
+
+## Profile ownership and publication: October 20, 2026
+
+After the storage-limit work in PR #25, app 05 now restricts profile lists, detail, downloads, retries, retention, and Action Cable notifications to the creating account. Staff have no override. Assets and inspection observations remain shared. The standalone adapter follows the selected demo identity, with the existing browser-storage and whole-store-backup limitations preserved.
+
+- Full Rails suites: **171 tests, 1278 assertions**, zero failures/errors. By app: 36/280, 35/277, 33/194, 26/162, and 41/365 tests/assertions.
+- Root frontend: **60 tests across 14 files**. Runtime and copied-file checks: **30 passed**. ESLint: zero warnings.
+- Standalone: **78 domain/storage/packaging tests and 10 interface tests**. All five full-stack frontend builds and all five standalone builds passed.
+- Ownership regressions cover access denial for other accounts (including staff), private success/failure notifications, per-owner retention, identity changes, stale detail responses, existing backup ownership, and preserving unfinished or ownerless records. A separate regression reproduced a retry exceeding the standalone retention limit before the fix.
+- The changed full-stack browser scenario now checks another account cannot list, download, retry, or receive notifications for the created profile. Real-service browser execution, container smoke tests, and Brakeman remain CI checks for this change; they were not rerun locally. The local bundle does not provide the Brakeman executable.
+- The README, how-to guide, and feature-report PDFs were rebuilt. Text and rendered pages were checked for ownership wording, the rights notice, clipping, and table layout.
+- The owner selected **all rights reserved**. `LICENSE` records that choice without changing third-party terms. Six local portfolio handoff images matched their already-tracked source screenshots byte-for-byte; only the duplicate local handoff directory was added to `.gitignore`.

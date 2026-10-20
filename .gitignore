@@ -30,3 +30,5 @@ __pycache__/
 /output/screenshots/service-requests-details.png
 /output/screenshots/service-requests-imports-reports.png
 /output/screenshots/service-requests-map.png
+# Local portfolio handoff copies; the original screenshots are already tracked.
+/public/images/projects/geospatial-web-lab/

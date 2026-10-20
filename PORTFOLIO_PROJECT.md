@@ -1,6 +1,6 @@
 # Geospatial Web Lab: portfolio content and implementation brief
 
-Prepared September 29, 2026; facts and evidence refreshed October 1, 2026. This document covers **five applications with two editions each**: the original full-stack implementations and separate standalone browser implementations.
+Prepared September 29, 2026; facts and evidence refreshed October 20, 2026. This document covers **five applications with two editions each**: the original full-stack implementations and separate standalone browser implementations.
 
 Use sections 1 and 2 as public portfolio content. Sections 3 through 6 are implementation notes and evidence references for the portfolio maintainer. This is a content handoff; it does not change or publish the portfolio website.
 
@@ -139,8 +139,8 @@ The verification records report:
 
 | Edition | Recorded checks |
 | --- | --- |
-| Full-stack | Rails, frontend and browser suites: 159 Rails tests with 1126 assertions and 58 frontend tests, recorded locally on October 17, 2026, and 13 browser scenarios against running services. CI runs them again on pull requests and on `main`, skipping changes limited to the standalone editions, Markdown files or `output/`. All five Docker stacks build and pass a container smoke test in CI. Benchmarks cover API latency, concurrent reads and background-job duration |
-| Standalone | 71 domain, storage and packaging tests; 10 interface tests; five static builds; a static-site check; browser checks of persistence, calculations, simulation, approvals, downloads, backup restore and storage migration |
+| Full-stack | 171 Rails tests with 1278 assertions and 60 frontend tests, recorded locally on October 20, 2026. Separate CI records cover 13 browser scenarios against running services and all five Docker smoke tests; those checks were not rerun locally for the ownership change. CI runs them on pull requests and on `main`, skipping changes limited to the standalone editions, Markdown files or `output/`. Benchmarks cover API latency, concurrent reads and background-job duration |
+| Standalone | 78 domain, storage and packaging tests and 10 interface tests, recorded locally on October 20, 2026; five static builds; separate publication checks cover served assets, persistence, calculations, simulation, approvals, downloads, backup restore and storage migration |
 
 Both editions' test and build pipelines run in clean Ubuntu CI checkouts. ESLint (both editions) and Brakeman (the five Rails backends) run in CI on every pull request and on `main`. These checks establish specific implemented behaviors. The benchmarks are single-machine measurements on synthetic data. They are not capacity guarantees, security certification, or evidence of operational adoption.
 
@@ -220,11 +220,11 @@ Keep map attribution visible. Identify the edition beside every image. Counts an
 | Recorded single-runner benchmarks | Proven capacity, uptime, or production scale |
 | Recorded tests and browser checks | Proven uptime, production scale, security certification, or business impact |
 
-The source repository was private while this document was first prepared and was made public on October 1, 2026. A source link and CI links can now appear on the public page. The repository has no license file, so public source is viewable but grants no reuse license. Do not publish local account credentials, machine paths, database backups, or runtime logs.
+The source repository was private while this document was first prepared and was made public on October 1, 2026. A source link and CI links can now appear on the public page. Original project material is published with [all rights reserved](LICENSE), without an additional reuse license; third-party material retains its own terms. Do not publish local account credentials, machine paths, database backups, or runtime logs.
 
 ## 6. Maintainer evidence references
 
-Original application source baseline: `fdee951a948d64ee0298b0904a626e6042b4504d`. The October 1 refresh covers the work merged afterwards: backup restore, storage limits, record-level standalone storage, container CI and benchmarks. Its standalone test counts were rerun locally; full-stack counts come from the dated records and CI. The October 17 update takes the full-stack and standalone counts from the [October 17 record in VERIFICATION.md](VERIFICATION.md#profile-recovery-and-documentation-october-17-2026); all 13 browser scenarios passed in the [full-stack CI run on `main` at 97e08fb](https://github.com/efkopru/geospatial-web-lab/actions/runs/39085540292). Repository visibility and the successful standalone CI run were checked while preparing this document.
+Original application source baseline: `fdee951a948d64ee0298b0904a626e6042b4504d`. The October 1 refresh covers the work merged afterwards: backup restore, storage limits, record-level standalone storage, container CI and benchmarks. The current local counts come from the [October 20 ownership record](VERIFICATION.md#profile-ownership-and-publication-october-20-2026). The separate [full-stack CI run on `main` at a07a51b](https://github.com/efkopru/geospatial-web-lab/actions/runs/39089815144) passed before the per-account ownership change. The [publication workflow at a07a51b](https://github.com/efkopru/geospatial-web-lab/actions/runs/39089819802) deployed and checked the standalone demo on October 17, 2026, America/Chicago. Refresh release references after publishing later source changes.
 
 | Reference | What it supports |
 | --- | --- |

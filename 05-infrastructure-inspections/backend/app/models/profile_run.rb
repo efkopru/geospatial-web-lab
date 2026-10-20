@@ -1,12 +1,14 @@
 class ProfileRun < ApplicationRecord
   belongs_to :user
   validates :status, inclusion: { in: %w[pending processing completed failed] }
-  # Completed runs keep their asset snapshot and samples, so only the newest are kept, as in the
-  # standalone edition. Pending, processing and failed runs stay so they can finish or be retried.
+  # Retention is per owner. Pending, processing and failed runs stay so they can finish or be retried.
   KEEP_COMPLETED = 20
 
-  def self.prune_completed!
-    completed = where(status: "completed")
+  def self.prune_completed!(user_id:)
+    # Legacy records without a known owner must never become a global cleanup scope.
+    return 0 if user_id.nil?
+
+    completed = where(user_id: user_id, status: "completed")
     completed.where.not(id: completed.order(id: :desc).limit(KEEP_COMPLETED).select(:id)).delete_all
   end
 

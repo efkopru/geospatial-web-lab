@@ -156,3 +156,9 @@ No uncaught page errors were reported. The check does not wait for ArcGIS basema
 ## Scope of the evidence
 
 The browser checks used locally served production files with internet access for ArcGIS resources. They did not publish GitHub Pages or test a desktop installer, complete offline operation, every device/browser combination, or operational GIS datasets. Simulated roles are not authentication. The mathematical differences from PostGIS and local-storage limits are documented in [COMPARISON.md](COMPARISON.md).
+
+## Profile ownership: October 20, 2026
+
+App 05 profile lists, details, downloads, retries, and retention now follow the selected demo identity. Completed-run retention runs after creation and successful retry and keeps the newest 20 completed runs per identity. Other identities, unfinished records, and unknown-owner records remain preserved. This is workflow simulation, not authentication; backups still contain the whole app store.
+
+The full standalone suite passed **78 domain/storage/packaging tests and 10 interface tests**. Seven dedicated ownership regressions cover owner filtering before the list limit, supplied-owner rejection, other-identity access denial, retry access, retention, and version-one backup restore/reopen. The retry-retention regression failed with 21 completed runs before the fix and passed with 20 after it. All five static builds and repository ESLint passed.
