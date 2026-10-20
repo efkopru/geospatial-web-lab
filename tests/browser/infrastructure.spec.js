@@ -59,7 +59,7 @@ test('Cesium corridor, shared observations, private profile job and export', asy
     ]);
     expect(created.status()).toBe(202);
     const runId = (await created.json()).profile_run.id;
-    await expect(staff.getByLabel('Profile run', { exact: true })).toHaveValue(String(runId));
+    await expect(staff.getByRole('combobox', { name: 'Profile run', exact: true })).toHaveValue(String(runId));
     await expect(staff.locator('.inspection-job')).toContainText('completed', { timeout: 30000 });
     await expect(staff.getByRole('img', { name: /Synthetic base elevation profile/ })).toBeVisible();
     await expect.poll(() => staffProfiles.some((message) => message.id === runId && message.status === 'completed')).toBe(true);
