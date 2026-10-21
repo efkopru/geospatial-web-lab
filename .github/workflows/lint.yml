@@ -53,14 +53,13 @@ jobs:
           ruby-version: '3.4'
       - name: Install Brakeman
         run: gem install brakeman --version 8.1.0 --no-document
-      # The lockfiles record the Ruby that last ran bundle on the local WSL setup (3.2.3).
-      # CI and the container images run Ruby 3.4, so the end-of-life Ruby check is excluded.
+      # All checks run, including the end-of-life Ruby check against the Ruby the lockfiles record.
       - name: Scan each Rails backend
         run: |
           status=0
           for backend in 0*/backend; do
             echo "::group::$backend"
-            brakeman --no-pager --quiet --except EOLRuby "$backend" || status=1
+            brakeman --no-pager --quiet "$backend" || status=1
             echo "::endgroup::"
           done
           exit "$status"

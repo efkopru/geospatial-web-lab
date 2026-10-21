@@ -1,15 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {verifySite,APPS} from '../scripts/verify-site.mjs';
+import {CONTENT_SECURITY_POLICY} from '../scripts/content-security-policy.mjs';
 
 const TYPES={'.svg':'image/svg+xml','.html':'text/html; charset=utf-8','.js':'application/javascript','.css':'text/css','.json':'application/json','.md':'text/markdown'};
-function site({spaFallback=false,omit=[]}={}){
+function site({spaFallback=false,omit=[],withoutPolicy=[]}={}){
  const files=new Map([
   ['/demo/',APPS.map(app=>`<a href="./${app}/">Open</a>`).join('')+'<a data-port href="http://127.0.0.1:5171/">Original</a>'],
   ['/demo/THIRD_PARTY_NOTICES.md','notices'],['/demo/licenses/SOURCES.json','{}']
  ]);
  for(const app of APPS){
-  files.set(`/demo/${app}/`,'<link rel="icon" href="./favicon.svg"><script type="module" src="./assets/index.js"></script><link rel="stylesheet" href="./assets/index.css">');
+  const policy=withoutPolicy.includes(app)?'':`<meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}"/>`;
+  files.set(`/demo/${app}/`,policy+'<link rel="icon" href="./favicon.svg"><script type="module" src="./assets/index.js"></script><link rel="stylesheet" href="./assets/index.css">');
   for(const asset of ['favicon.svg','assets/index.js','assets/index.css','THIRD_PARTY_NOTICES.md'])files.set(`/demo/${app}/${asset}`,'content');
  }
  files.set('/demo/05-infrastructure-inspections/cesium/Assets/approximateTerrainHeights.json','{}');
@@ -34,4 +36,9 @@ test('site verification reports missing files, including single-page fallbacks t
  assert.deepEqual(missing.failures,['https://example.test/demo/02-data-quality-portal/THIRD_PARTY_NOTICES.md: HTTP 404','https://example.test/demo/03-fleet-monitor/assets/index.js: HTTP 404']);
  const fallback=await verifySite('https://example.test/demo/',{fetch:site({spaFallback:true,omit:['/demo/04-parcel-scenarios/assets/index.css']})});
  assert.deepEqual(fallback.failures,['https://example.test/demo/04-parcel-scenarios/assets/index.css: unexpected content type "text/html; charset=utf-8"']);
+});
+
+test('site verification reports an app page without the Content-Security-Policy',async()=>{
+ const result=await verifySite('https://example.test/demo/',{fetch:site({withoutPolicy:['04-parcel-scenarios']})});
+ assert.deepEqual(result.failures,['https://example.test/demo/04-parcel-scenarios/: page does not carry the Content-Security-Policy']);
 });

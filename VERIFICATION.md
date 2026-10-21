@@ -212,3 +212,24 @@ After the storage-limit work in PR #25, app 05 now restricts profile lists, deta
 - The changed full-stack browser scenario now checks another account cannot list, download, retry, or receive notifications for the created profile. Real-service browser execution, container smoke tests, and Brakeman remain CI checks for this change; they were not rerun locally. The local bundle does not provide the Brakeman executable.
 - The README, how-to guide, and feature-report PDFs were rebuilt. Text and rendered pages were checked for ownership wording, the rights notice, clipping, and table layout.
 - The owner selected **all rights reserved**. `LICENSE` records that choice without changing third-party terms. Six local portfolio handoff images matched their already-tracked source screenshots byte-for-byte; only the duplicate local handoff directory was added to `.gitignore`.
+
+## Security hardening: October 21, 2026
+
+Failed sign-ins are now also limited per email across all client addresses, the apps send a Content-Security-Policy, and the local toolchain moved to Ruby 3.4.
+
+| Project | Tests | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Service requests | 38 | 330 | Passed |
+| Data quality portal | 37 | 327 | Passed |
+| Fleet monitor | 35 | 244 | Passed |
+| Parcel scenarios | 28 | 212 | Passed |
+| Infrastructure inspections | 43 | 415 | Passed |
+| Total | 181 | 1528 | No failures, errors, or skipped tests |
+
+- **Sign-in limit across addresses.** Two new tests in the shared authentication suite, identical in all five apps, failed against the previous controller in service requests. They cover: 30 failures from 30 addresses refusing a correct password from a new browser; a browser that signed in before still signing in and its failures not counting; another account unaffected; the limit lifting after an hour; and a browser being exempt only for the five accounts it signed in to most recently. The two copied-cookie tests now pick the session cookie by name, because sign-in also sets the encrypted remembered-accounts cookie.
+- **Content-Security-Policy.** The policy was derived by loading all five standalone builds in Chromium with a strict report-only policy and allowing only what the map libraries need: the ArcGIS hosts and Google Fonts, `blob:` workers, WebAssembly compilation and inline styles. Cesium's bundled Knockout evaluated `(0,eval)("this")` on load and stopped Cesium under the policy; the builds now substitute `globalThis`, and app 05 then loaded with no reports. The only remaining report is ArcGIS calling `Function()` once to test whether eval is allowed, after which it avoids eval.
+- **Policy checks.** A new browser test served each full-stack production build with the nginx policy against the WSL backends: all five apps signed in, subscribed to live updates and drew their map or scene with nothing blocked. It failed when the tile host was removed from the policy, and when app 05 was built without the Knockout substitution. The standalone site check confirmed the policy in all five pages, and the standalone browser check passed all five apps on the local preview with one canvas each. A clicked marker in the standalone service-request map selected its request. The copied-file check now fails when the two editions' policies differ.
+- **Browser suite.** The complete Playwright run passed all 18 scenarios, the 13 existing ones and the 5 policy checks, against backends on Ruby 3.4. A first run failed the live-update scenarios because Ubuntu's automatic updates restarted Redis in WSL midway and the running APIs' Action Cable listeners did not reconnect; after the backends restarted, every scenario passed.
+- **Ruby 3.4.** WSL now runs Ruby 3.4.11, built into `/usr/local` with ruby-build; the Ubuntu Ruby 3.2 package remains installed but is no longer first on `PATH`. The Gemfiles require Ruby 3.4 or newer, and the lockfiles changed only in their recorded Ruby version. Brakeman 8.1.0 ran every check, including the end-of-life Ruby check that CI previously skipped, and reported no warnings in any backend.
+- Root Vitest passed 60 tests across 14 files; runtime and copied-file checks passed 31; the standalone editions passed 79 domain, storage and packaging tests and 10 interface tests. ESLint reported no problems, and all five full-stack and all five standalone builds passed.
+- Not verified locally: the container smoke test's new header check (no Docker engine) and the GitHub repository security settings, which the owner changes.

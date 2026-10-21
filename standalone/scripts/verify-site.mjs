@@ -1,8 +1,10 @@
 // Checks that a served standalone build (local preview or a static host) exposes the
-// gallery, all five apps, their bundled assets and the preserved third-party notices.
+// gallery, all five apps with their Content-Security-Policy, their bundled assets and the
+// preserved third-party notices.
 // Browser behavior (IndexedDB, WebGL, downloads) still needs an interactive check.
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
+import {CONTENT_SECURITY_POLICY} from './content-security-policy.mjs';
 
 export const APPS=['01-service-requests','02-data-quality-portal','03-fleet-monitor','04-parcel-scenarios','05-infrastructure-inspections'];
 const EXPECTED_TYPES={'.js':/javascript/,'.css':/text\/css/,'.svg':/image\/svg\+xml/,'.json':/json/,'.md':/text\//};
@@ -31,6 +33,7 @@ export async function verifySite(baseUrl,{fetch=globalThis.fetch}={}){
  for(const app of APPS){
   const appBase=new URL(`${app}/`,base);
   const html=await get(appBase,{html:true});if(html===null)continue;
+  if(!html.includes(`<meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}"`))failures.push(`${appBase.href}: page does not carry the Content-Security-Policy`);
   const assets=localReferences(html);
   if(!assets.some(path=>path.endsWith('.js')))failures.push(`${appBase.href}: no bundled script reference`);
   for(const path of assets)await get(new URL(path,appBase));
@@ -46,5 +49,5 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const result=await verifySite(target);
  console.log(`Checked ${result.checked.length} URLs under ${target}`);
  for(const failure of result.failures)console.error(`FAIL ${failure}`);
- if(!result.ok)process.exitCode=1;else console.log('Gallery, five apps, bundled assets and notices are reachable.');
+ if(!result.ok)process.exitCode=1;else console.log('Gallery, five apps with their Content-Security-Policy, bundled assets and notices are reachable.');
 }

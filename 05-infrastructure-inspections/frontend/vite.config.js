@@ -18,4 +18,15 @@ function cesiumAssets(){
   closeBundle(){mkdirSync(join(output,'cesium'),{recursive:true});for(const directory of ['Assets','ThirdParty','Workers','Widgets'])cpSync(join(cesiumRoot,directory),join(output,'cesium',directory),{recursive:true});}
  };
 }
-export default defineConfig({plugins:[react(),cesiumAssets()],define:{CESIUM_BASE_URL:JSON.stringify('/cesium/')},server:{proxy:{'/api':{target:'http://127.0.0.1:3105',changeOrigin:false},'/up':{target:'http://127.0.0.1:3105',changeOrigin:false},'/cable':{target:'ws://127.0.0.1:3105',ws:true,changeOrigin:false}}},build:{chunkSizeWarningLimit:5000}});
+// Cesium bundles Knockout, which finds the global object with (0,eval)("this") unless it runs as a
+// classic script. The Content-Security-Policy in scripts/nginx.conf refuses eval, which stops Cesium
+// loading, so the build substitutes globalThis, the same object. The build fails if Knockout stops matching.
+function knockoutWithoutEval(){
+ return {name:'knockout-without-eval',apply:'build',transform(code,id){
+  if(!/[\\/]knockout-[\d.]+\.js$/.test(id))return null;
+  const patched=code.replace('this||(0,eval)("this")','globalThis');
+  if(patched===code)throw new Error(`${id} no longer uses the expected global lookup; update knockoutWithoutEval in vite.config.js`);
+  return {code:patched,map:null};
+ }};
+}
+export default defineConfig({plugins:[react(),cesiumAssets(),knockoutWithoutEval()],define:{CESIUM_BASE_URL:JSON.stringify('/cesium/')},server:{proxy:{'/api':{target:'http://127.0.0.1:3105',changeOrigin:false},'/up':{target:'http://127.0.0.1:3105',changeOrigin:false},'/cable':{target:'ws://127.0.0.1:3105',ws:true,changeOrigin:false}}},build:{chunkSizeWarningLimit:5000}});

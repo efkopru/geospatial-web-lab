@@ -61,13 +61,13 @@ The local verification record uses Rails 8.1.4, React 19.3, ArcGIS Maps SDK 5.1.
 
 After seeding, sign in with `staff@example.test` or `reporter@example.test`, password `Learning123!`. These are learning accounts only. Staff can manage operational workflows; reporters have restricted access enforced by Rails. Each app uses a different session cookie.
 
-Sessions expire after 24 hours and can be revoked on the server. Failed sign-ins are limited to five per email and twenty per client address in 15 minutes; successful sign-ins are not counted. Logout invalidates copied cookies and disconnects that login's live subscriptions. If notification delivery is unavailable, subscriptions recheck authorization every 15 seconds. The session migration invalidates cookies from older application revisions; sign in again after upgrading.
+Sessions expire after 24 hours and can be revoked on the server. Failed sign-ins are limited to five for one email from one client address and twenty from one address within 15 minutes, and to thirty for one email from all addresses within an hour. A browser that has signed in to an account before is exempt from the hourly limit, so guessing from elsewhere cannot lock the owner out of a browser they already use; an encrypted cookie remembers the five accounts it signed in to most recently, for a year after the last sign-in. Successful sign-ins are not counted. Logout invalidates copied cookies and disconnects that login's live subscriptions. If notification delivery is unavailable, subscriptions recheck authorization every 15 seconds. The session migration invalidates cookies from older application revisions; sign in again after upgrading.
 
 Login and logout changes propagate to other tabs for the same application. Account changes discard the previous account's drafts. Returning to a tab rechecks its session while preserving drafts when the account is unchanged.
 
 ## Local setup reference
 
-The verified environment uses Node 24 on Windows, with Ruby 3.2.3, PostgreSQL 16/PostGIS 3.4, and Redis 7 in Ubuntu 24.04 WSL. Install prerequisites and backend gems as described in [HOW_TO_USE.md](HOW_TO_USE.md) before this sequence. Bootstrap configures services and databases; it does not install the development toolchain.
+The verified environment uses Node 24 on Windows, with Ruby 3.4.11, PostgreSQL 16/PostGIS 3.4, and Redis 7 in Ubuntu 24.04 WSL. Install prerequisites and backend gems as described in [HOW_TO_USE.md](HOW_TO_USE.md) before this sequence. Bootstrap configures services and databases; it does not install the development toolchain.
 
 From PowerShell in this folder:
 
@@ -102,7 +102,7 @@ The application processes use the `geolab` database role with password `geolab`.
 
 ## Set up another Linux/WSL environment
 
-Install Ruby 3.2+ (CI and the supplied container use 3.4; Ruby 3.2 reached end of life on 2026-03-31), Bundler, PostgreSQL with matching PostGIS packages, Redis, Node 24, and native build prerequisites (`build-essential`, `libpq-dev`, `libyaml-dev`). Run `bundle install` in each backend. Run bootstrap as root on Ubuntu, or provision the databases and extensions with your database administrator. Adjust the `/mnt/c/...` path when using a different checkout.
+Install Ruby 3.4 or newer (the Gemfiles require it; CI and the supplied container use 3.4, and Ubuntu 24.04 packages only 3.2), Bundler, PostgreSQL with matching PostGIS packages, Redis, Node 24, and native build prerequisites (`build-essential`, `libpq-dev`, `libyaml-dev`). Run `bundle install` in each backend. Run bootstrap as root on Ubuntu, or provision the databases and extensions with your database administrator. Adjust the `/mnt/c/...` path when using a different checkout.
 
 Application database names are `service_requests`, `data_quality_portal`, `fleet_monitor`, `parcel_scenarios`, and `infrastructure_inspections`; test databases add `_test`. Override `DATABASE_URL`, `TEST_DATABASE_URL`, and `REDIS_URL` to use other services.
 
@@ -119,7 +119,7 @@ docker compose up --build -d
 docker compose exec api bundle exec rails db:seed
 ```
 
-Compose builds the selected frontend from the parent npm workspace. It runs nginx, Rails/Puma, a separate Sidekiq worker, PostGIS, and Redis. Database and Redis volumes persist across container restarts. Services restart after failures. The Rails image runs as a non-root user. PostgreSQL initializes PostGIS as administrator and grants a separate `geolab_app` role ownership of application tables; Rails never receives the administrator password. Migrations finish before API and worker startup and do not create demo accounts. Application ports bind only to localhost by default. nginx sends security headers, compresses text assets, caches Vite's content-hashed files for a year, and revalidates `index.html` on every visit. The sign-in form prefills the learning accounts unless `.env` sets `DEMO_ACCOUNTS=false` before the build; use that setting for a stack that is not seeded. Use all five Compose files to run all five independent stacks.
+Compose builds the selected frontend from the parent npm workspace. It runs nginx, Rails/Puma, a separate Sidekiq worker, PostGIS, and Redis. Database and Redis volumes persist across container restarts. Services restart after failures. The Rails image runs as a non-root user. PostgreSQL initializes PostGIS as administrator and grants a separate `geolab_app` role ownership of application tables; Rails never receives the administrator password. Migrations finish before API and worker startup and do not create demo accounts. Application ports bind only to localhost by default. nginx sends security headers, including a Content-Security-Policy that allows scripts only from the site and map data only from the ArcGIS hosts (the comment in `scripts/nginx.conf` explains each source). It compresses text assets, caches Vite's content-hashed files for a year, and revalidates `index.html` on every visit. The sign-in form prefills the learning accounts unless `.env` sets `DEMO_ACCOUNTS=false` before the build; use that setting for a stack that is not seeded. Use all five Compose files to run all five independent stacks.
 
 The backend image pins Ruby 3.4 on Debian trixie and explicitly installs the PostgreSQL 17 client to match the database service. CI also installs client 17; PostgreSQL's dump utility cannot read a server with a newer major version than the client.
 
@@ -146,9 +146,9 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The lint workflow also runs Brakeman, which is not in the Gemfiles. To run it locally, install `brakeman` 8.1.0 and run `brakeman --no-pager --except EOLRuby <project>/backend` for each backend. The end-of-life Ruby check is excluded because the lockfiles record the local Ruby 3.2.3.
+The lint workflow also runs Brakeman, which is not in the Gemfiles. To run it locally, install `brakeman` 8.1.0 and run `brakeman --no-pager <project>/backend` for each backend. Every check runs, including the end-of-life Ruby check against the Ruby 3.4 the lockfiles record.
 
-Backend suites exercise PostGIS operations, validation, ownership and staff permissions, state transitions, replay generation guards, job deduplication, immutable dataset versions, stale writes, and calculated outcomes. React tests verify user interactions and the shared request/CSRF contract. Browser tests use real APIs and workers. Read [VERIFICATION.md](VERIFICATION.md) for observed results and remaining environmental limitations.
+Backend suites exercise PostGIS operations, validation, ownership and staff permissions, state transitions, replay generation guards, job deduplication, immutable dataset versions, stale writes, and calculated outcomes. React tests verify user interactions and the shared request/CSRF contract. Browser tests use real APIs and workers. One serves each production build with the nginx Content-Security-Policy and fails on anything the policy blocks; the Vite development servers send no policy. Read [VERIFICATION.md](VERIFICATION.md) for observed results and remaining environmental limitations.
 
 Tests explicitly migrate their test databases. Rails automatic test schema replacement is disabled because a restricted app role must not drop/recreate the administrator-owned PostGIS extension. `db/structure.sql` captures native spatial/generated columns and database constraints.
 

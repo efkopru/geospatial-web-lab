@@ -5,10 +5,21 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
     @user = User.create!(email: 'auth-audit@example.test', name: 'Audit user', password: 'Learning123!', role: 'staff')
   end
 
+  # Sign-in sets the session cookie and the remembered-accounts cookie; this returns the session one.
+  def session_cookie(response)
+    name = Rails.application.config.session_options[:key]
+    Array(response.headers['Set-Cookie']).flat_map { |header| header.split("\n") }.find { |cookie| cookie.start_with?("#{name}=") }.split(';').first
+  end
+
+  # Records the failures a guessing attack spread over many addresses leaves on an email.
+  def reach_account_limit(email)
+    Rails.cache.write("failed-sign-ins:account:#{Digest::SHA256.hexdigest(email)}", Api::SessionsController::FAILED_SIGN_INS_PER_ACCOUNT, expires_in: 1.hour)
+  end
+
   test 'a copied cookie cannot authenticate after the original session logs out' do
     post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
     assert_response :success
-    copied_cookie = response.headers['Set-Cookie'].split(';').first
+    copied_cookie = session_cookie(response)
     delete '/api/session', as: :json
     assert_response :success
     replay = ActionDispatch::Integration::Session.new(Rails.application)
@@ -50,7 +61,7 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
 
   test 'signing in again revokes the prior cookie and stores only the token digest' do
     post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
-    cookie = response.headers['Set-Cookie'].split(';').first
+    cookie = session_cookie(response)
     old = LoginSession.find_by!(user: @user)
     post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
     assert old.reload.revoked_at
@@ -88,6 +99,46 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
     end
     post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
     assert_response :too_many_requests
+  end
+
+  test 'failed sign-ins for one email are limited across addresses, except in browsers that signed in before' do
+    known = open_session
+    known.post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json, env: {'REMOTE_ADDR' => '198.51.100.1'}
+    known.assert_response :success
+    cookies_set = Array(known.response.headers['Set-Cookie']).join("\n")
+    assert_includes cookies_set, Rails.application.config.session_options[:key].delete_suffix('_session') + '_known_accounts='
+    assert_not_includes cookies_set, Digest::SHA256.hexdigest(@user.email), 'The remembered accounts are encrypted'
+    Api::SessionsController::FAILED_SIGN_INS_PER_ACCOUNT.times do |attempt|
+      post '/api/session', params: {email: @user.email, password: 'wrong password'}, as: :json, env: {'REMOTE_ADDR' => "203.0.113.#{attempt + 1}"}
+      assert_response :unauthorized
+    end
+    post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json, env: {'REMOTE_ADDR' => '192.0.2.1'}
+    assert_response :too_many_requests
+    assert_match 'Too many failed sign-in attempts for this account', response.parsed_body['error']
+    # A browser that signed in before can still sign in, and its failures are not counted for the account.
+    known.post '/api/session', params: {email: @user.email, password: 'wrong password'}, as: :json, env: {'REMOTE_ADDR' => '192.0.2.2'}
+    known.assert_response :unauthorized
+    known.post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json, env: {'REMOTE_ADDR' => '192.0.2.2'}
+    known.assert_response :success
+    other = User.create!(email: 'auth-other@example.test', name: 'Other user', password: 'Learning123!', role: 'reporter')
+    post '/api/session', params: {email: other.email, password: 'Learning123!'}, as: :json, env: {'REMOTE_ADDR' => '192.0.2.1'}
+    assert_response :success
+    travel Api::SessionsController::FAILED_SIGN_IN_ACCOUNT_WINDOW + 1.minute
+    post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json, env: {'REMOTE_ADDR' => '192.0.2.1'}
+    assert_response :success
+  end
+
+  test 'a browser is exempt from the account limit only for the five accounts it signed in to most recently' do
+    users = 6.times.map { |index| User.create!(email: "known-#{index}@example.test", name: "Known #{index}", password: 'Learning123!', role: 'reporter') }
+    users.each do |user|
+      post '/api/session', params: {email: user.email, password: 'Learning123!'}, as: :json
+      assert_response :success
+    end
+    users.first(2).each { |user| reach_account_limit(user.email) }
+    post '/api/session', params: {email: users.first.email, password: 'Learning123!'}, as: :json
+    assert_response :too_many_requests
+    post '/api/session', params: {email: users.second.email, password: 'Learning123!'}, as: :json
+    assert_response :success
   end
 
   test 'a successful sign-in clears the failed attempts for that email' do

@@ -1,6 +1,7 @@
 // Opens a served standalone build in Chromium and checks what verify-site.mjs cannot: each app
 // starts with browser storage, exports a backup, restores a changed backup through the UI, keeps
-// the change after a reload, and hides local-only full-stack links on a public host.
+// the change after a reload, loads nothing its Content-Security-Policy blocks, and hides local-only
+// full-stack links on a public host.
 // Usage: node scripts/verify-site-browser.mjs <url>
 // CHROMIUM_PATH selects a browser binary; CHROMIUM_ARGS is a JSON array of extra launch flags.
 import { chromium } from 'playwright';
@@ -9,6 +10,7 @@ import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { APPS } from './verify-site.mjs';
+import { isArcgisEvalTest } from './content-security-policy.mjs';
 
 const target = process.argv[2];
 if (!target) { console.error('Usage: node scripts/verify-site-browser.mjs <url>'); process.exit(2); }
@@ -38,6 +40,21 @@ const storedText = (page, app) => page.evaluate(id => new Promise((resolve, reje
   };
 }), app);
 const saved = page => page.getByText('Saved in this browser (IndexedDB)').waitFor({ timeout: 90000 });
+// Collects every Content-Security-Policy report from a context's pages, across reloads.
+async function recordPolicyReports(context) {
+  const reports = [];
+  await context.exposeBinding('reportPolicyViolation', (_source, report) => { reports.push(report); });
+  await context.addInitScript(() => document.addEventListener('securitypolicyviolation', event => {
+    globalThis.reportPolicyViolation({ effectiveDirective: event.effectiveDirective, blockedURI: event.blockedURI, sourceFile: event.sourceFile });
+  }));
+  return reports;
+}
+const scripts = new Map();
+const scriptText = url => {
+  if (!url) return Promise.resolve('');
+  if (!scripts.has(url)) scripts.set(url, fetch(url).then(response => response.text()).catch(() => ''));
+  return scripts.get(url);
+};
 // Records what a page actually showed, so a failure on a remote host can be diagnosed from the log.
 function watch(page) {
   const notes = [];
@@ -60,7 +77,7 @@ try {
       const originals = await page.locator('[data-port]').count();
       const hostedTip = await page.locator('[data-hosted]').count();
       if (!local && (originals || !hostedTip)) fail('gallery', `public host shows ${originals} local full-stack links and ${hostedTip} hosted notes (HTTP ${response?.status()}) ${await describe()}`);
-      rows.push(['gallery', 'opened', local ? 'local host variant' : `hosted variant (${originals} local links)`, '—']);
+      rows.push(['gallery', 'opened', local ? 'local host variant' : `hosted variant (${originals} local links)`, '—', '—']);
     } catch (error) {
       fail('gallery', `${error.message.split('\n')[0]} ${await describe()}`);
     } finally {
@@ -69,6 +86,7 @@ try {
   }
   for (const app of APPS) {
     const context = await browser.newContext({ acceptDownloads: true });
+    const reports = await recordPolicyReports(context);
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -99,11 +117,19 @@ try {
       if (!after.text.includes(marker)) fail(app, `restored ${field} was not kept after a reload`);
       if (after.revision <= before) fail(app, `stored revision did not advance (${before} -> ${after.revision})`);
       const shown = await page.getByText(marker).first().isVisible().catch(() => false);
+      // The map or scene loads its libraries, data and tiles after the page is saved; waiting for it
+      // (or for its error, where the runner has no WebGL) lets the policy reports cover those loads.
+      await page.locator('canvas, .map-error').first().waitFor({ timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(3000);
       const canvases = await page.locator('canvas').count();
       // Uncaught errors fail the check, except WebGL availability, which depends on the runner.
       const unexpected = errors.filter(message => !/webgl/i.test(message));
       if (unexpected.length) fail(app, `uncaught page errors: ${unexpected.join(' | ').slice(0, 300)}`);
-      rows.push([app, 'saved, exported, restored, reloaded', `${field} kept${shown ? ' and shown' : ''}; revision ${before} -> ${after.revision}`, `${canvases} canvas${canvases === 1 ? '' : 'es'}`]);
+      // ArcGIS's test of whether eval is allowed is the only report a working app makes.
+      const blocked = [];
+      for (const report of reports) if (!isArcgisEvalTest(report, await scriptText(report.sourceFile))) blocked.push(`${report.effectiveDirective} ${report.blockedURI || 'inline'}`);
+      if (blocked.length) fail(app, `Content-Security-Policy blocked ${[...new Set(blocked)].join(', ').slice(0, 300)}`);
+      rows.push([app, 'saved, exported, restored, reloaded', `${field} kept${shown ? ' and shown' : ''}; revision ${before} -> ${after.revision}`, `${canvases} canvas${canvases === 1 ? '' : 'es'}`, `${reports.length - blocked.length} ArcGIS eval test${reports.length - blocked.length === 1 ? '' : 's'}${blocked.length ? `, ${blocked.length} blocked` : ''}`]);
     } catch (error) {
       fail(app, `${error.message.split('\n')[0]} ${await describe()}${errors.length ? `; page errors: ${errors.join(' | ').slice(0, 300)}` : ''}`);
     } finally {
@@ -115,7 +141,7 @@ try {
   await rm(folder, { recursive: true, force: true });
 }
 
-const table = ['### Browser check of ' + base.href, '', '| App | Workflow | Result | Map or scene canvases |', '| --- | --- | --- | --- |', ...rows.map(row => `| ${row.join(' | ')} |`), ''].join('\n');
+const table = ['### Browser check of ' + base.href, '', '| App | Workflow | Result | Map or scene canvases | Policy reports |', '| --- | --- | --- | --- | --- |', ...rows.map(row => `| ${row.join(' | ')} |`), ''].join('\n');
 console.log(table);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, table + '\n');
 for (const failure of failures) console.error(`FAIL ${failure}`);
