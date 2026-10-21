@@ -94,7 +94,7 @@ Open [the local gallery](http://127.0.0.1:5270/). Use either this gallery-only c
 
 The demo is published at [https://efkopru.github.io/geospatial-web-lab/](https://efkopru.github.io/geospatial-web-lab/). The manual [Publish standalone demo](../.github/workflows/standalone-pages.yml) workflow publishes it. It tests and builds the suite, checks the built gallery through the local preview server, uploads `standalone/dist` to GitHub Pages and checks the deployed URL. Then it runs the [browser check](../.github/workflows/standalone-browser-check.yml) against the live site. Start it from the Actions tab after standalone changes; it does not run on every push, because publishing replaces the public site. Before the first run, set **Settings > Pages > Build and deployment > Source** to **GitHub Actions**. Making a repository public does not turn Pages on, and "Deploy from a branch" must not be used: GitHub's branch build would replace the demo with a Jekyll rendering of the repository. The workflow stops with an error if the source is not GitHub Actions.
 
-`npm run verify:site -- <url>` checks any served copy of the build, local or hosted. It confirms that the gallery links all five apps and that each app's scripts, styles, icon and third-party notices are served with the expected content types. It also checks the Cesium assets for app 05 and the license copies at the gallery root. A host that answers missing files with its HTML page fails the check. The script does not open a browser. On a public host, the gallery and app shells hide the links to the local full-stack apps.
+`npm run verify:site -- <url>` checks any served copy of the build, local or hosted. It confirms that the gallery links all five apps, that each app page carries the Content-Security-Policy, and that each app's scripts, styles, icon and third-party notices are served with the expected content types. It also checks the Cesium assets for app 05 and the license copies at the gallery root. A host that answers missing files with its HTML page fails the check. The script does not open a browser. On a public host, the gallery and app shells hide the links to the local full-stack apps.
 
 `npm run verify:browser -- <url>` opens the served site in Chromium (run `npx playwright install chromium` once). On a public host it checks that the gallery and every app hide the local full-stack links. In each of the five apps it then:
 
@@ -102,9 +102,13 @@ The demo is published at [https://efkopru.github.io/geospatial-web-lab/](https:/
 - downloads a backup and checks it belongs to that app
 - changes the first record's name or title in the backup and restores it through the UI
 - reloads the page and confirms that the change and a higher stored revision were kept
+- waits up to 30 seconds for the map or scene, or its error, so the libraries, data and tiles load while it watches
 - fails on any uncaught page error other than WebGL availability
+- fails on anything the Content-Security-Policy blocked, except ArcGIS's test of whether eval is allowed
 
-It also reports how many map or scene canvases each app drew. ArcGIS map rendering depends on network access to Esri services, so rendering is reported, not enforced. The browser check uses a fresh browser profile and never changes the published files.
+It also reports how many map or scene canvases each app drew and how many policy reports it excused. ArcGIS map rendering depends on network access to Esri services, so rendering is reported, not enforced. The browser check uses a fresh browser profile and never changes the published files.
+
+Built app pages carry a Content-Security-Policy as their first `<meta>` element, because GitHub Pages cannot send response headers. It is the policy nginx sends for the full-stack apps (`scripts/content-security-policy.mjs` explains each source), except that a `<meta>` policy cannot forbid framing, so other sites can still frame the published pages. Development servers send no policy, and the gallery page, which holds no data, has none.
 
 `node scripts/benchmark.mjs` measures the local adapters at their storage limits; the latest results are in [VERIFICATION.md](VERIFICATION.md#performance-baseline-october-1-2026).
 

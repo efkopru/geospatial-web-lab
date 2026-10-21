@@ -6,7 +6,7 @@ Setup, operation, and demonstration guide for the five learning applications. Al
 
 Keep the five project folders, `shared`, and the root npm workspace together. The frontends import shared components and cannot be built from isolated project folders.
 
-The validated local arrangement uses Node 24 on Windows and Ubuntu 24.04 under WSL for Ruby 3.2.3, Rails 8.1.4, PostgreSQL 16/PostGIS 3.4, and Redis 7. Another Linux environment needs Ruby 3.2 or newer, Bundler 4.0.21 as recorded in the lockfiles, PostgreSQL with matching PostGIS packages, Redis, Node 24, and native build prerequisites including `build-essential`, `libpq-dev`, and `libyaml-dev`.
+The validated local arrangement uses Node 24 on Windows and Ubuntu 24.04 under WSL for Ruby 3.4.11, Rails 8.1.4, PostgreSQL 16/PostGIS 3.4, and Redis 7. Ubuntu 24.04 packages Ruby 3.2, so the validated setup built 3.4.11 into `/usr/local` with [ruby-build](https://github.com/rbenv/ruby-build). Another Linux environment needs Ruby 3.4 or newer (the Gemfiles require it), Bundler 4.0.21 as recorded in the lockfiles, PostgreSQL with matching PostGIS packages, Redis, Node 24, and native build prerequisites including `build-essential`, `libpq-dev`, and `libyaml-dev`.
 
 Install these prerequisites before running the project scripts. `bootstrap-wsl.sh` provisions local databases and starts services; it does not install Ruby, database packages, or application dependencies. Use a PostgreSQL client with the same major version as the server for database dumps.
 
@@ -118,7 +118,7 @@ Use separate browser profiles or a normal and private window for simultaneous us
 
 Sessions expire after 24 hours. Logout revokes that login on the server. Account changes discard the previous account's drafts. Reauthenticate after an expired session or an upgrade that invalidates older cookies.
 
-Failed sign-ins are limited: five for one email, or twenty from one address, within 15 minutes, after which the API answers "Too many failed sign-in attempts" until the window passes. Successful sign-ins are never counted and clear that email's failures.
+Failed sign-ins are limited: five for one email from one address, or twenty from one address, within 15 minutes, and thirty for one email from all addresses within an hour. After that the API answers "Too many failed sign-in attempts" until the window passes. A browser that has signed in to the account before is exempt from the hourly limit, so the owner can still sign in there while someone guesses from elsewhere. Successful sign-ins are never counted and clear that email's failures from that address.
 
 ## 5. Demonstrate each workflow
 
@@ -246,9 +246,10 @@ For the default local WSL arrangement, `sudo bash scripts/verify-backup.sh` chec
 | An export stays processing | Generate a new report with **Generate CSV report**. The stuck entry drops out of the recent-reports list as newer reports are added. |
 | An upload or save is refused for an account limit | The message names the limit: 100 imports, 50 MB of stored datasets, or 1,000 saved scenarios per account. Delete scenarios to save more; imports and datasets cannot be deleted in the app. |
 | Replay shows running but vehicles do not move | The worker running the replay may have stopped. Check the worker, then choose **Pause** and **Start replay**. |
-| Sign-in says "Too many failed sign-in attempts" | Wait 15 minutes, or clear the counts in that backend with `bundle exec rails runner 'Rails.cache.clear'` (in Compose: `docker compose exec api bundle exec rails runner 'Rails.cache.clear'`). |
+| Sign-in says "Too many failed sign-in attempts" | Wait 15 minutes. When the message says "for this account", wait an hour or sign in from a browser that has signed in to the account before. Alternatively clear the counts in that backend with `bundle exec rails runner 'Rails.cache.clear'` (in Compose: `docker compose exec api bundle exec rails runner 'Rails.cache.clear'`). |
 | API fails during startup | Inspect `.runtime/<project>-api.log`; check PostgreSQL, credentials, and migrations. |
-| Live indicator is offline | Polling can recover persisted state. Check API, Redis, and WebSocket connectivity. |
+| Live indicator is offline | Polling can recover persisted state. Check API, Redis, and WebSocket connectivity. If Redis restarted while the API was running, restart the API: its live-update listener does not reconnect by itself. In WSL, Ubuntu's automatic updates can restart Redis. |
 | Blank map or scene | Check internet access for ArcGIS and WebGL support. Continue through the linked register where available. |
+| A map, scene, font or request works with the development servers but not in a container or the published demo | The Content-Security-Policy refused it, and the browser console names the refused URL. Add its host to the matching directive in both `scripts/nginx.conf` and `standalone/scripts/content-security-policy.mjs`; `tests/shared-copies.node.mjs` checks that they agree. One refused eval report per map page is expected: ArcGIS tests whether eval is allowed and then avoids it. |
 | Save reports stale data | Reload current values or reopen the edit form, then review before saving. |
 | Login disappears in another tab | Tabs share that app's session. Use separate browser profiles for simultaneous roles. |

@@ -162,3 +162,13 @@ The browser checks used locally served production files with internet access for
 App 05 profile lists, details, downloads, retries, and retention now follow the selected demo identity. Completed-run retention runs after creation and successful retry and keeps the newest 20 completed runs per identity. Other identities, unfinished records, and unknown-owner records remain preserved. This is workflow simulation, not authentication; backups still contain the whole app store.
 
 The full standalone suite passed **78 domain/storage/packaging tests and 10 interface tests**. Seven dedicated ownership regressions cover owner filtering before the list limit, supplied-owner rejection, other-identity access denial, retry access, retention, and version-one backup restore/reopen. The retry-retention regression failed with 21 completed runs before the fix and passed with 20 after it. All five static builds and repository ESLint passed.
+
+## Content-Security-Policy: October 21, 2026
+
+Each built app page now carries the full-stack apps' Content-Security-Policy as a `<meta>` element, without `frame-ancestors`, which a `<meta>` policy cannot carry. The gallery page has none.
+
+- All five apps were loaded on the local preview with the policy enforced. The four ArcGIS apps reported only ArcGIS's single test of whether eval is allowed, and app 05 reported nothing once the build replaced Cesium's bundled Knockout `eval` with `globalThis`. Before that replacement, app 05 drew no scene under the policy.
+- `npm run verify:site` now fails when an app page lacks the policy; a new site-verification test covers that.
+- `npm run verify:browser` now waits up to 30 seconds for the map or scene after its final reload, then fails on any blocked load except ArcGIS's eval test. On the local preview all five apps passed with one canvas each. That differs from the October 1 record, where the check finished before any map canvas was drawn.
+- In the browser pane, the service-request map drew its basemap tiles and markers under the policy, and clicking a marker selected its request. App 05's corridor view looked the same as on the published site, which has no policy.
+- The domain, storage and packaging suite passed 79 tests and the interface suite 10.
