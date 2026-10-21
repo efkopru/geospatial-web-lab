@@ -42,3 +42,13 @@ for (const [fullStack, standalone] of editionCopies) {
     assert.ok(read(standalone) === read(fullStack), `${standalone} differs from ${fullStack}; apply the change to both editions`);
   });
 }
+
+// The full-stack apps send their Content-Security-Policy from nginx; the standalone build writes the
+// same policy into each page, where a <meta> element cannot carry frame-ancestors.
+test('the standalone Content-Security-Policy matches the nginx policy', async () => {
+  const header = read('scripts/nginx.conf').match(/add_header Content-Security-Policy "([^"]+)" always;/);
+  assert.ok(header, 'scripts/nginx.conf does not send a Content-Security-Policy');
+  const {CONTENT_SECURITY_POLICY} = await import(new URL('../standalone/scripts/content-security-policy.mjs', import.meta.url));
+  assert.equal(`${CONTENT_SECURITY_POLICY}; frame-ancestors 'none'`, header[1],
+    'standalone/scripts/content-security-policy.mjs and scripts/nginx.conf differ; apply the change to both editions');
+});
