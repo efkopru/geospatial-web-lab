@@ -233,3 +233,21 @@ Failed sign-ins are now also limited per email across all client addresses, the 
 - **Ruby 3.4.** WSL now runs Ruby 3.4.11, built into `/usr/local` with ruby-build; the Ubuntu Ruby 3.2 package remains installed but is no longer first on `PATH`. The Gemfiles require Ruby 3.4 or newer, and the lockfiles changed only in their recorded Ruby version. Brakeman 8.1.0 ran every check, including the end-of-life Ruby check that CI previously skipped, and reported no warnings in any backend.
 - Root Vitest passed 60 tests across 14 files; runtime and copied-file checks passed 31; the standalone editions passed 79 domain, storage and packaging tests and 10 interface tests. ESLint reported no problems, and all five full-stack and all five standalone builds passed.
 - Not verified locally: the container smoke test's new header check (no Docker engine) and the GitHub repository security settings, which the owner changes.
+
+## Dependency security updates: October 25, 2026
+
+Dependabot alerts and security updates are now enabled for the repository. Its open alerts covered four packages, all fixed by patch releases. Both lockfiles now use the fixed versions, and `npm audit` reports no known vulnerabilities in either the root workspace or the standalone edition.
+
+| Package | Before | After | Where it is used |
+| --- | --- | --- | --- |
+| dompurify | 3.4.16 | 3.4.17 | Bundled into app 05 through Cesium, which uses it to sanitize credit and info-panel HTML |
+| vite | 8.3.1 | 8.3.3 | Build tool and development server, pinned in all five frontends and the standalone edition |
+| vitest, @vitest/mocker | 4.1.11 | 4.1.12 | Test runner; `chai` and `tinyrainbow` moved with it |
+| undici | 7.30.0 | 7.30.1 | Comes with jsdom, used only by tests |
+| zod | 4.6.5 | 4.6.7 | ESLint React-hooks plugin, used only for linting (alert dismissed automatically) |
+
+- ESLint reported no problems. Root Vitest passed 60 tests across 14 files, runtime and copied-file checks passed 31, and the standalone edition passed 79 domain, storage and packaging tests and 10 interface tests.
+- All five full-stack and all five standalone builds passed. Each standalone app page still carries the Content-Security-Policy, and app 05's bundles still contain no Knockout `eval`.
+- On the local preview, the standalone site check passed, and the browser check passed all five apps with one canvas each and only ArcGIS's eval test reported.
+- The complete Playwright run passed all 18 scenarios against the WSL backends, through the updated Vite development servers and, for the five policy checks, the new production builds.
+- No backend gems changed, so the Rails suites and Brakeman were left to CI.
