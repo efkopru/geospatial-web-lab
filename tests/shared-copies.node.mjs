@@ -13,10 +13,10 @@ const backendCopies = [
   'app/channels/application_cable/channel.rb', 'app/channels/application_cable/connection.rb',
   'app/controllers/api/sessions_controller.rb', 'app/controllers/application_controller.rb',
   'app/jobs/application_job.rb', 'app/models/application_record.rb', 'app/models/login_session.rb', 'app/models/user.rb',
-  'config/boot.rb', 'config/environment.rb', 'config/environments/development.rb',
+  'config/boot.rb', 'config/environment.rb', 'config/environments/development.rb', 'config/initializers/action_cable_redis_listener.rb',
   'config/environments/production.rb', 'config/environments/test.rb',
   'db/migrate/001_create_users.rb', 'db/migrate/010_create_login_sessions.rb',
-  'test/authentication_test.rb', 'test/test_helper.rb'
+  'test/action_cable_redis_listener_test.rb', 'test/authentication_test.rb', 'test/test_helper.rb'
 ];
 const editionCopies = [
   ['shared/geometry.js', 'standalone/shared/geometry.js'],
