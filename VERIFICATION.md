@@ -251,3 +251,21 @@ Dependabot alerts and security updates are now enabled for the repository. Its o
 - On the local preview, the standalone site check passed, and the browser check passed all five apps with one canvas each and only ArcGIS's eval test reported.
 - The complete Playwright run passed all 18 scenarios against the WSL backends, through the updated Vite development servers and, for the five policy checks, the new production builds.
 - No backend gems changed, so the Rails suites and Brakeman were left to CI.
+
+## Live updates after a Redis restart: October 27, 2026
+
+In Rails 8.1, Action Cable's Redis listener retried a lost connection once, immediately, then ended its thread and was never replaced. A Redis restart therefore stopped live updates in every app until the API restarted; this happened during the October 21 browser run. Each failed attempt also discarded the confirmations owed to streams opened while Redis was away. A new initializer, identical in all five backends, keeps the listener retrying with backoff until Redis returns or the server shuts down, and keeps those confirmations. The app refuses to boot if Rails changes the listener methods it relies on.
+
+| Project | Tests | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Service requests | 41 | 341 | Passed |
+| Data quality portal | 40 | 338 | Passed |
+| Fleet monitor | 38 | 255 | Passed |
+| Parcel scenarios | 31 | 223 | Passed |
+| Infrastructure inspections | 46 | 426 | Passed |
+| Total | 196 | 1583 | No failures, errors, or skipped tests |
+
+- Three new tests per backend use a real Redis. They close the listener's subscription connection and refuse reconnection for one or two seconds. Without the initializer, the open-stream test and the new-stream test failed. With only the retry half, the new-stream test still failed: its confirmation was lost. The third test checks that shutting down while Redis is away returns instead of retrying forever.
+- End to end on the WSL stack: a staff page in the service-request app stayed open while `service redis-server restart` ran. The API logged the lost connection and then "reconnected to Redis and resubscribed 2 streams". A broadcast to the staff stream reached the page, which still showed "Live updates connected".
+- On those backends, still running since the restart, every Playwright scenario passed: 17 in a full run, and the parcels scenario on its own. In that full run, the parcels scenario failed to load a pre-bundled Vite dependency whose version had just changed. The preceding run had ended with app 05's Vite dev server crashing on Windows (exit 0xC0000409). Neither failure involved Action Cable.
+- The copied-file check now also covers the initializer and its test.

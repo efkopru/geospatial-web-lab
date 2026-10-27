@@ -44,7 +44,7 @@ PostgreSQL + PostGIS      Redis + Sidekiq
 Persistent records      Queued domain jobs
 ```
 
-Each application is an independent stack. The UI reads authoritative records from Rails. ActionCable notifications prompt refreshes; reconnect handling and polling recover missed updates. Rails authorizes writes, and Sidekiq processes imports, exports, validation, replay, and calculations. Durable results are independent of notification delivery.
+Each application is an independent stack. The UI reads authoritative records from Rails. ActionCable notifications prompt refreshes; reconnect handling and polling recover missed updates. When Redis restarts, each API keeps retrying its Redis subscription and resubscribes open streams once Redis is back (`config/initializers/action_cable_redis_listener.rb`). Rails authorizes writes, and Sidekiq processes imports, exports, validation, replay, and calculations. Durable results are independent of notification delivery.
 
 | Learning objective | Implemented evidence |
 | --- | --- |
