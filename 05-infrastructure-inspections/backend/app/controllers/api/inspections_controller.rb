@@ -2,6 +2,10 @@ module Api
   class InspectionsController < ApplicationController
     before_action :require_user!
     before_action :require_staff!, only: :update
+    # One account may record this many observations in ten minutes.
+    CREATES_PER_TEN_MINUTES = 60
+    rate_limit to: CREATES_PER_TEN_MINUTES, within: 10.minutes, only: :create, by: -> { current_user.id },
+      with: -> { render json: { error: "You are recording observations too quickly. Wait a few minutes and try again." }, status: :too_many_requests }
 
     def create
       asset = InfrastructureAsset.find(params[:asset_id])

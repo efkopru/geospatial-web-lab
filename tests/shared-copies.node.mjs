@@ -16,8 +16,9 @@ const backendCopies = [
   'config/boot.rb', 'config/environment.rb', 'config/environments/development.rb',
   'config/environments/production.rb', 'config/environments/test.rb',
   'config/initializers/action_cable_redis_listener.rb', 'config/initializers/forwarded_headers.rb',
+  'config/initializers/request_logging.rb',
   'db/migrate/001_create_users.rb', 'db/migrate/010_create_login_sessions.rb',
-  'test/action_cable_redis_listener_test.rb', 'test/authentication_test.rb', 'test/test_helper.rb'
+  'test/action_cable_redis_listener_test.rb', 'test/authentication_test.rb', 'test/request_hardening_test.rb', 'test/test_helper.rb'
 ];
 const editionCopies = [
   ['shared/geometry.js', 'standalone/shared/geometry.js'],

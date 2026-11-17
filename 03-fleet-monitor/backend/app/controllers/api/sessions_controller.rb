@@ -3,8 +3,8 @@ require 'digest'
 module Api
   class SessionsController < ApplicationController
     # Failed sign-ins are counted per client address, per address and email, and per email across
-    # all addresses. Successful sign-ins are never counted, so normal use is not slowed while
-    # password guessing is. The per-email count stops guessing spread over many addresses. A
+    # all addresses. Successful sign-ins never count as failures, so normal use is not slowed
+    # while password guessing is. The per-email count stops guessing spread over many addresses. A
     # browser that has signed in to the account before is exempt from it, so guessing cannot lock
     # the owner out of a browser they already use; the per-address counts still apply there.
     FAILED_SIGN_IN_WINDOW = 15.minutes
@@ -12,6 +12,10 @@ module Api
     FAILED_SIGN_INS_PER_EMAIL = 5
     FAILED_SIGN_IN_ACCOUNT_WINDOW = 1.hour
     FAILED_SIGN_INS_PER_ACCOUNT = 30
+    # Every attempt whose password is checked costs a password hash, whether it succeeds or not,
+    # so an address is also limited in how many it may make. The limit leaves room for many
+    # people who share one address.
+    SIGN_INS_PER_ADDRESS = 300
     # A browser remembers the accounts it signed in to most recently, as email digests.
     KNOWN_ACCOUNTS_PER_BROWSER = 5
     KNOWN_ACCOUNTS_LIFETIME = 1.year
@@ -28,6 +32,9 @@ module Api
         return render json: {error: 'Too many failed sign-in attempts for this account. Wait an hour and try again, or sign in from a browser that has signed in to this account before.'}, status: :too_many_requests
       when Symbol
         return render json: {error: 'Too many failed sign-in attempts. Wait 15 minutes and try again.'}, status: :too_many_requests
+      end
+      if sign_in_attempts_exceeded?
+        return render json: {error: 'Too many sign-in attempts from this address. Wait 15 minutes and try again.'}, status: :too_many_requests
       end
       # authenticate_by takes the same time whether or not the email exists.
       user = User.authenticate_by(email: email, password: params[:password].to_s)
@@ -67,6 +74,11 @@ module Api
       }
       counts.delete(:account) if known_accounts.include?(digest)
       counts
+    end
+
+    # Counts this attempt. Attempts refused for too many failures are not counted: no password is checked.
+    def sign_in_attempts_exceeded?
+      Rails.cache.increment("sign-ins:#{request.remote_ip}", 1, expires_in: FAILED_SIGN_IN_WINDOW).to_i > SIGN_INS_PER_ADDRESS
     end
 
     def sign_in_limit_reached(email)

@@ -20,7 +20,7 @@ class ReplayEngine
         TelemetryPoint.delete_all
         Vehicle.update_all(longitude: nil, latitude: nil, speed_kph: 0, captured_at: nil, last_sequence: -1)
       when "speed"
-        replay.update!(speed: Integer(speed.to_s, 10))
+        replay.update!(speed: Integer(speed.to_s, 10, exception: false) || raise(ArgumentError, "Replay speed must be 1, 2 or 4"))
       else
         raise ArgumentError, "Unknown replay action"
       end

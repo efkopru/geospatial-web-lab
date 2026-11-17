@@ -8,12 +8,11 @@ class TelemetryRecorder
   MAX_MANUAL_SEQUENCE = MAX_SEQUENCE - 1_000_000
 
   def self.record!(vehicle:, sequence:, longitude:, latitude:, speed_kph: 0, captured_at: Time.current, max_sequence: MAX_SEQUENCE)
-    sequence = Integer(sequence.to_s, 10)
-    raise ArgumentError, "Sequence must be an integer from 0 to #{max_sequence}" unless sequence.between?(0, max_sequence)
-    longitude = Float(longitude)
-    latitude = Float(latitude)
-    speed_kph = Float(speed_kph)
-    raise ArgumentError, "Invalid telemetry coordinates or speed" unless longitude.finite? && latitude.finite? && speed_kph.finite? &&
+    # Conversions return nil instead of raising, so every rejection carries one of these messages.
+    sequence = Integer(sequence.to_s, 10, exception: false)
+    raise ArgumentError, "Sequence must be an integer from 0 to #{max_sequence}" unless sequence&.between?(0, max_sequence)
+    longitude, latitude, speed_kph = [longitude, latitude, speed_kph].map { |value| Float(value, exception: false) }
+    raise ArgumentError, "Invalid telemetry coordinates or speed" unless [longitude, latitude, speed_kph].all? { |value| value&.finite? } &&
       longitude.between?(-180, 180) && latitude.between?(-90, 90) && speed_kph.between?(0, 250)
 
     accepted = false

@@ -2,17 +2,30 @@ module Api
   class IssuesController < ApplicationController
     before_action :require_user!
     before_action :require_staff!, only: %i[update staff]
+    # Imports are the route for bulk entry, so one account may create this many requests by hand
+    # in ten minutes.
+    CREATES_PER_TEN_MINUTES = 120
+    rate_limit to: CREATES_PER_TEN_MINUTES, within: 10.minutes, only: :create, by: -> { current_user.id },
+      with: -> { render json: { error: 'You are creating requests too quickly. Wait a few minutes and try again.' }, status: :too_many_requests }
 
     def index
+      filters = %i[status category q].index_with { |key| params[key] }.compact_blank
+      unless filters.values.all?(String)
+        return render json: { error: 'The status, category and search filters must be text.' }, status: :unprocessable_entity
+      end
       scope = Issue.visible_to(current_user)
-      scope = scope.where(status: params[:status]) if params[:status].present?
-      scope = scope.where(category: params[:category]) if params[:category].present?
-      if params[:q].present?
-        term = "%#{Issue.sanitize_sql_like(params[:q].to_s.first(160))}%"
+      scope = scope.where(status: filters[:status]) if filters[:status]
+      scope = scope.where(category: filters[:category]) if filters[:category]
+      if filters[:q]
+        term = "%#{Issue.sanitize_sql_like(filters[:q].first(160))}%"
         scope = scope.where('title ILIKE ? OR description ILIKE ?', term, term)
       end
       if %i[latitude longitude radius_m].any? { |key| params[key].present? }
-        lat, lon, radius = %i[latitude longitude radius_m].map { |key| Float(params.require(key)) }
+        begin
+          lat, lon, radius = %i[latitude longitude radius_m].map { |key| Float(params.require(key)) }
+        rescue ArgumentError, TypeError
+          return render json: { error: 'Distance filter must contain numeric latitude, longitude, and radius.' }, status: :unprocessable_entity
+        end
         unless lat.finite? && lon.finite? && radius.finite? && lat.between?(-90, 90) && lon.between?(-180, 180) && radius.between?(1, 100_000)
           return render json: { error: 'Distance filter requires valid coordinates and a radius from 1 to 100000 meters.' }, status: :unprocessable_entity
         end
@@ -23,8 +36,6 @@ module Api
         total_count: scope.count, counts: scope.group(:status).count,
         categories: Issue::CATEGORIES, statuses: Issue::STATUSES
       }
-    rescue ArgumentError, TypeError
-      render json: { error: 'Distance filter must contain numeric latitude, longitude, and radius.' }, status: :unprocessable_entity
     end
 
     def show

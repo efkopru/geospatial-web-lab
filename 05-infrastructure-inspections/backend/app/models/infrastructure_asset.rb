@@ -10,11 +10,28 @@ class InfrastructureAsset < ApplicationRecord
   validates :corridor_order, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   after_save :write_geometry
 
-  def payload
+  # Open and critical observation counts by asset id, for every asset or the given ones, in one
+  # query. Listing assets therefore never loads the observations themselves.
+  def self.open_inspection_counts(asset_ids = nil)
+    scope = Inspection.where(status: "open")
+    scope = scope.where(infrastructure_asset_id: asset_ids) if asset_ids
+    scope.group(:infrastructure_asset_id)
+      .pluck(:infrastructure_asset_id, Arel.sql("COUNT(*)"), Arel.sql("COUNT(*) FILTER (WHERE severity = 'critical')"))
+      .to_h { |id, open, critical| [id, { open: open, critical: critical }] }
+  end
+
+  # Every asset's payload in corridor order, from two queries.
+  def self.payloads
+    counts = open_inspection_counts
+    order(:corridor_order, :id).map { |asset| asset.payload(counts[asset.id]) }
+  end
+
+  def payload(counts = self.class.open_inspection_counts(id)[id])
+    counts ||= { open: 0, critical: 0 }
     as_json(only: %i[id asset_code name kind longitude latitude ground_elevation_m structure_height_m corridor_order]).merge(
       "top_elevation_m" => ground_elevation_m + structure_height_m,
-      "open_inspections" => inspections.count { |inspection| inspection.status == "open" },
-      "critical_inspections" => inspections.count { |inspection| inspection.status == "open" && inspection.severity == "critical" }
+      "open_inspections" => counts[:open],
+      "critical_inspections" => counts[:critical]
     )
   end
 

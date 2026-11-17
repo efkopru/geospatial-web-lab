@@ -13,7 +13,10 @@ module Api
     end
     scope = scope.where('ST_Intersects(geom, ST_MakeEnvelope(?, ?, ?, ?, 4326))', *bbox)
    end
-   scope = scope.where(district: params[:district]) if params[:district].present?
+   if params[:district].present?
+    return render json: {error: 'district must be text'}, status: :unprocessable_entity unless params[:district].is_a?(String)
+    scope = scope.where(district: params[:district])
+   end
    render json: {type: 'FeatureCollection', features: scope.features}
   end
  end

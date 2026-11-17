@@ -42,7 +42,7 @@ class DatasetSecondAuditTest < ActionDispatch::IntegrationTest
       post '/api/datasets', params: {name: "Name\u0000", source: @source}, as: :json
     end
     assert_response :unprocessable_entity
-    assert_match 'Name cannot contain the NUL character', response.parsed_body['error']
+    assert_equal "The parameter name contains the NUL character (\\u0000), which cannot be stored. Remove it and try again.", response.parsed_body['error']
   end
 
   test 'a dataset reopened by uploading it again stays listed when it is older than the newest 100' do

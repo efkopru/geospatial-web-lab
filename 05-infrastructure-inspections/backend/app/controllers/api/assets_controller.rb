@@ -3,11 +3,11 @@ module Api
     before_action :require_user!
 
     def index
-      render json: { assets: InfrastructureAsset.includes(:inspections).order(:corridor_order, :id).map(&:payload), source: "Synthetic corridor assets and elevations" }
+      render json: { assets: InfrastructureAsset.payloads, source: "Synthetic corridor assets and elevations" }
     end
 
     def show
-      asset = InfrastructureAsset.includes(:inspections).find(params[:id])
+      asset = InfrastructureAsset.find(params[:id])
       render json: { asset: asset.payload, inspections: asset.inspections.includes(:author, :resolved_by, inspection_events: :actor).order(created_at: :desc).map(&:payload) }
     end
   end
