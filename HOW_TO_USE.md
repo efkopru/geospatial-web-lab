@@ -6,7 +6,7 @@ Setup, operation, and demonstration guide for the five learning applications. Al
 
 Keep the five project folders, `shared`, and the root npm workspace together. The frontends import shared components and cannot be built from isolated project folders.
 
-The validated local arrangement uses Node 24 on Windows and Ubuntu 24.04 under WSL for Ruby 3.4.11, Rails 8.1.4, PostgreSQL 16/PostGIS 3.4, and Redis 7. Ubuntu 24.04 packages Ruby 3.2, so the validated setup built 3.4.11 into `/usr/local` with [ruby-build](https://github.com/rbenv/ruby-build). Another Linux environment needs Ruby 3.4 or newer (the Gemfiles require it), Bundler 4.0.21 as recorded in the lockfiles, PostgreSQL with matching PostGIS packages, Redis, Node 24, and native build prerequisites including `build-essential`, `libpq-dev`, and `libyaml-dev`.
+The validated local arrangement uses Node 24 on Windows and Ubuntu 24.04 under WSL for Ruby 3.4.11, Rails 8.1.4.1, PostgreSQL 16/PostGIS 3.4, and Redis 7. Ubuntu 24.04 packages Ruby 3.2, so the validated setup built 3.4.11 into `/usr/local` with [ruby-build](https://github.com/rbenv/ruby-build). Another Linux environment needs Ruby 3.4 or newer (the Gemfiles require it), Bundler 4.0.21 as recorded in the lockfiles, PostgreSQL with matching PostGIS packages, Redis, Node 24, and native build prerequisites including `build-essential`, `libpq-dev`, and `libyaml-dev`.
 
 Install these prerequisites before running the project scripts. `bootstrap-wsl.sh` provisions local databases and starts services; it does not install Ruby, database packages, or application dependencies. Use a PostgreSQL client with the same major version as the server for database dumps.
 
@@ -118,7 +118,7 @@ Use separate browser profiles or a normal and private window for simultaneous us
 
 Sessions expire after 24 hours. Logout revokes that login on the server. Account changes discard the previous account's drafts. Reauthenticate after an expired session or an upgrade that invalidates older cookies.
 
-Failed sign-ins are limited: five for one email from one address, or twenty from one address, within 15 minutes, and thirty for one email from all addresses within an hour. After that the API answers "Too many failed sign-in attempts" until the window passes. A browser that has signed in to the account before is exempt from the hourly limit, so the owner can still sign in there while someone guesses from elsewhere. Successful sign-ins are never counted and clear that email's failures from that address.
+Failed sign-ins are limited: five for one email from one address, or twenty from one address, within 15 minutes, and thirty for one email from all addresses within an hour. After that the API answers "Too many failed sign-in attempts" until the window passes. A browser that has signed in to the account before is exempt from the hourly limit, so the owner can still sign in there while someone guesses from elsewhere. Successful sign-ins are never counted and clear that email's failures from that address. The address is the one nginx reports in `X-Forwarded-For`; a `Forwarded` header sent by the client is ignored.
 
 ## 5. Demonstrate each workflow
 
