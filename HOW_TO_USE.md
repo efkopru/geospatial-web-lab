@@ -118,7 +118,7 @@ Use separate browser profiles or a normal and private window for simultaneous us
 
 Sessions expire after 24 hours. Logout revokes that login on the server. Account changes discard the previous account's drafts. Reauthenticate after an expired session or an upgrade that invalidates older cookies.
 
-Failed sign-ins are limited: five for one email from one address, or twenty from one address, within 15 minutes, and thirty for one email from all addresses within an hour. After that the API answers "Too many failed sign-in attempts" until the window passes. A browser that has signed in to the account before is exempt from the hourly limit, so the owner can still sign in there while someone guesses from elsewhere. Successful sign-ins are never counted and clear that email's failures from that address. The address is the one nginx reports in `X-Forwarded-For`; a `Forwarded` header sent by the client is ignored.
+Failed sign-ins are limited: five for one email from one address, or twenty from one address, within 15 minutes, and thirty for one email from all addresses within an hour. After that the API answers "Too many failed sign-in attempts" until the window passes. A browser that has signed in to the account before is exempt from the hourly limit, so the owner can still sign in there while someone guesses from elsewhere. Successful sign-ins never count as failures and clear that email's failures from that address. An address may make 300 sign-in attempts of any kind in 15 minutes. An account keeps its 20 newest sessions; when more browsers sign in to one account, the one that signed in longest ago is signed out. The address is the one nginx reports in `X-Forwarded-For`; a `Forwarded` header sent by the client is ignored.
 
 ## 5. Demonstrate each workflow
 
@@ -131,7 +131,7 @@ Failed sign-ins are limited: five for one email from one address, or twenty from
 5. As staff, open **Imports & reports**. Choose **Download example**, then upload the downloaded GeoJSON. Review progress and **Review rejected rows** when present. Uploading the same content again reuses the existing owned import.
 6. Choose **Generate CSV report**, wait for `completed`, then **Download CSV**. The report contains all requests, regardless of current map filters, and is downloadable only by its requesting staff account.
 
-Imports accept 1 to 500 Point features under the 2 MB limit. Each needs a `title`; supported categories are `roads`, `lighting`, `drainage`, and `parks`, with `roads` as the default. Valid rows continue when other rows fail validation. Correct bad source rows and submit a new upload. **Retry import** is for a failed processing run, not for repairing invalid records. The map/register shows at most 500 matching requests while summary counts cover all matches. An account may hold 100 imports; uploading a file you imported before still reopens its import. Only your newest 30 CSV reports are kept.
+Imports accept 1 to 500 Point features under the 2 MB limit. Each needs a `title`; supported categories are `roads`, `lighting`, `drainage`, and `parks`, with `roads` as the default. Valid rows continue when other rows fail validation. Correct bad source rows and submit a new upload. **Retry import** is for a failed processing run, not for repairing invalid records. The map/register shows at most 500 matching requests while summary counts cover all matches. An account may hold 100 imports; uploading a file you imported before still reopens its import. Only your newest 30 CSV reports are kept. One account may create 120 requests by hand in ten minutes; import a file to add more.
 
 ### Data quality portal
 
@@ -171,7 +171,7 @@ Inputs allow 1 to 30 floors, 5% to 80% coverage, and unit areas from 400 to 3,00
 4. In a staff session, choose **Resolve observation**, supply resolution notes, then **Save status change**. Review **History**. Staff can **Reopen observation** with a reason. If another user changes an open draft, cancel and reopen the form before saving.
 5. Choose **Generate profile**. Wait for `completed`, inspect the chart and **Profile samples**, then **Download profile GeoJSON**. A failed run exposes **Retry preprocessing**. Each account can list, download, retry, or resume only its own profile runs, including staff accounts. Only the newest 20 completed runs per account are kept; older completed runs for that account are removed when its new run completes. Assets and observations remain shared. The standalone edition applies the same workflow to its selected demo identity, but browser storage and backups are not private from someone controlling that browser.
 
-The profile snapshots source asset values and linearly interpolates synthetic base elevations, using PostGIS geography distances. Eight seeded assets produce 71 samples. The corridor surface is not a measured DEM or clearance assessment. Registers and observation forms remain usable if the 3D renderer cannot initialize.
+The profile snapshots source asset values and linearly interpolates synthetic base elevations, using PostGIS geography distances. Eight seeded assets produce 71 samples. The corridor surface is not a measured DEM or clearance assessment. Registers and observation forms remain usable if the 3D renderer cannot initialize. One account may record 60 observations in ten minutes.
 
 ## 6. Run verification
 
@@ -207,7 +207,7 @@ docker compose up --build -d
 docker compose exec api bundle exec rails db:seed
 ```
 
-The configuration script generates missing secrets for all five projects and preserves existing secrets. Seeding is optional and creates known demo credentials. The sign-in form prefills them unless `.env` sets `DEMO_ACCOUNTS=false` before the build; the form then starts empty and the bundle omits the demo password. Each Compose stack includes nginx, Rails, Sidekiq, PostGIS, and Redis. Migrations run before API and worker startup. `docker compose down` stops the stack while preserving volumes. Do not add `-v` when preserving data.
+The configuration script generates missing secrets for all five projects and preserves existing secrets. Seeding is optional and creates known demo credentials. The sign-in form prefills them unless `.env` sets `DEMO_ACCOUNTS=false` before the build; the form then starts empty and the bundle omits the demo password. Each Compose stack includes nginx, Rails, Sidekiq, PostGIS, and Redis. nginx accepts request bodies up to 64 KB, 3 MB for a request import and 12 MB for a dataset. Each container keeps at most 50 MB of logs. Migrations run before API and worker startup. `docker compose down` stops the stack while preserving volumes. Do not add `-v` when preserving data.
 
 For an older database volume, back it up, generate the new application password, then run:
 
@@ -245,8 +245,12 @@ For the default local WSL arrangement, `sudo bash scripts/verify-backup.sh` chec
 | A scenario stays queued | If the worker is running, the calculation job was lost before it started. Queued scenarios cannot be retried; delete the scenario and save it again. |
 | An export stays processing | Generate a new report with **Generate CSV report**. The stuck entry drops out of the recent-reports list as newer reports are added. |
 | An upload or save is refused for an account limit | The message names the limit: 100 imports, 50 MB of stored datasets, or 1,000 saved scenarios per account. Delete scenarios to save more; imports and datasets cannot be deleted in the app. |
+| A save says you are creating requests or recording observations too quickly | One account may create 120 service requests, or record 60 observations, in ten minutes. Wait a few minutes. Import a GeoJSON file to add many requests. |
+| A message says a parameter contains the NUL character | PostgreSQL cannot store that character. Remove it from the named field and send the form again. |
+| A request is answered with 413 in a container | nginx accepts 64 KB per request, 3 MB for a request import and 12 MB for a dataset. Shorten the text or split the file. |
+| A browser is signed out although nobody chose **Sign out** | The account has more than 20 sessions, which a shared demo account can reach. Each further sign-in ends the session that signed in longest ago. Sign in again. |
 | Replay shows running but vehicles do not move | The worker running the replay may have stopped. Check the worker, then choose **Pause** and **Start replay**. |
-| Sign-in says "Too many failed sign-in attempts" | Wait 15 minutes. When the message says "for this account", wait an hour or sign in from a browser that has signed in to the account before. Alternatively clear the counts in that backend with `bundle exec rails runner 'Rails.cache.clear'` (in Compose: `docker compose exec api bundle exec rails runner 'Rails.cache.clear'`). |
+| Sign-in says "Too many failed sign-in attempts" or "Too many sign-in attempts from this address" | Wait 15 minutes. When the message says "for this account", wait an hour or sign in from a browser that has signed in to the account before. The address message means 300 attempts of any kind came from one address in 15 minutes. Alternatively clear the counts in that backend with `bundle exec rails runner 'Rails.cache.clear'` (in Compose: `docker compose exec api bundle exec rails runner 'Rails.cache.clear'`). |
 | API fails during startup | Inspect `.runtime/<project>-api.log`; check PostgreSQL, credentials, and migrations. |
 | Live indicator is offline | Polling can recover persisted state. Check API, Redis, and WebSocket connectivity. After a Redis restart, live updates resume without restarting the API: it retries after 0.5, 1 and 2 seconds and then every 5 seconds, and the API log reports "Action Cable reconnected to Redis". In WSL, Ubuntu's automatic updates can restart Redis. |
 | Blank map or scene | Check internet access for ArcGIS and WebGL support. Continue through the linked register where available. |

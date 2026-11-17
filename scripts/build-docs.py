@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import html
 import re
+from datetime import date
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
@@ -24,6 +25,8 @@ from reportlab.platypus import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# Printed in every page footer, so a reader can tell how current a PDF is.
+BUILT = date.today().isoformat()
 OUTPUT = ROOT / "output" / "pdf"
 DOCS = {
     "README.md": ("Project overview", "Architecture, setup, and verification"),
@@ -264,7 +267,7 @@ class Document(BaseDocTemplate):
         canvas.setLineWidth(0.5)
         canvas.line(MARGIN, 35, PAGE_W - MARGIN, 35)
         canvas.setFont(BODY, 7.5)
-        canvas.drawString(MARGIN, 23, f"Source: {self.source_name} | Documentation edition 2026-09-29")
+        canvas.drawString(MARGIN, 23, f"Source: {self.source_name} | Built {BUILT}")
         canvas.drawRightString(PAGE_W - MARGIN, 23, str(doc.page))
         canvas.restoreState()
 

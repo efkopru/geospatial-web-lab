@@ -71,6 +71,7 @@ step "frontend, /up and /api/session respond through nginx"
 index_headers="$(curl -fsS -D - -o /dev/null "$base/" | tr -d '\r' | tr '[:upper:]' '[:lower:]')"
 [[ "$index_headers" == *'x-content-type-options: nosniff'* ]] || fail "the page is served without X-Content-Type-Options"
 [[ "$index_headers" == *'x-frame-options: deny'* ]] || fail "the page is served without X-Frame-Options"
+[[ "$index_headers" != *'server: nginx/'* ]] || fail "nginx reports its version in the Server header"
 [[ "$index_headers" == *"content-security-policy: default-src 'self';"*"frame-ancestors 'none'"* ]] || fail "the page is served without its Content-Security-Policy"
 [[ "$index_headers" == *'cache-control: no-cache'* ]] || fail "the page is cacheable, so a new deployment may not be picked up"
 asset_headers="$(curl -fsS -D - -o /dev/null -H 'Accept-Encoding: gzip' "$base/$script" | tr -d '\r' | tr '[:upper:]' '[:lower:]')"
@@ -94,6 +95,22 @@ rm -f "$jar"
 [[ "$codes" == "401 401 401 401 401 429 " ]] || fail "six failed sign-ins sent with Forwarded headers answered $codes, not five 401s and a 429"
 step "a client's Forwarded header does not move its failed sign-ins to another address"
 
+# nginx accepts 64 KB on ordinary routes and more only on the two upload routes. Rails then logs
+# a body larger than 10 KB as its size, so a request cannot fill the log with its content.
+# The bodies are valid JSON: Rails quotes the first characters of a body it cannot parse in its
+# error message, which would put the padding in the log this step searches.
+padded() { printf '{"padding":"%s"}' "$(head -c "$1" /dev/zero | tr '\000' 'x')" | curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary @- "$base$2"; }
+[[ "$(padded 200000 /api/session)" == 413 ]] || fail "a 200 KB body sent to /api/session was not refused with 413"
+[[ "$(padded 200000 /api/import_runs)" != 413 ]] || fail "a 200 KB body sent to the import route was refused with 413"
+marker="smoke$RANDOM$RANDOM"
+status="$(printf '{"email":"%s@example.test","padding":"%s"}' "$marker" "$(head -c 50000 /dev/zero | tr '\000' 'x')" |
+ curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary @- "$base/api/session")"
+[[ "$status" == 422 ]] || fail "a sign-in without a CSRF token answered $status, not 422"
+api_log="$("${compose[@]}" logs --no-color api)"
+[[ "$api_log" == *'bytes not logged'* ]] || fail "the API log does not record the size of a 50 KB request body"
+[[ "$api_log" != *"$marker"* && "$api_log" != *'xxxxxxxxxxxxxxxx'* ]] || fail "the API log contains the content of a 50 KB or 200 KB request body"
+step "large bodies are refused outside the upload routes and are not written to the API log"
+
 "${compose[@]}" exec -T api bundle exec rails db:seed >/dev/null || fail "db:seed failed in the API container"
 step "seed data loaded inside the API container"
 
@@ -103,6 +120,8 @@ for service in api worker web; do
  restarts="$(docker inspect -f '{{.RestartCount}}' "$container")"
  state="$(docker inspect -f '{{.State.Status}}' "$container")"
  [[ "$state" == running && "$restarts" == 0 ]] || fail "$service is $state with $restarts restarts"
+ limits="$(docker inspect -f '{{.HostConfig.SecurityOpt}} {{index .HostConfig.LogConfig.Config "max-size"}}' "$container")"
+ [[ "$limits" == *no-new-privileges* && "$limits" == *10m ]] || fail "$service runs without no-new-privileges or log rotation: $limits"
 done
-step "API, worker and web are running without restarts"
+step "API, worker and web are running without restarts, with rotated logs and no new privileges"
 echo "PASS $project container smoke test"

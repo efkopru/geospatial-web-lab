@@ -12,7 +12,7 @@ module Api
     end
 
     def create
-      snapshot = InfrastructureAsset.includes(:inspections).order(:corridor_order, :id).map(&:payload)
+      snapshot = InfrastructureAsset.payloads
       return render(json: { error: "At least two assets are required" }, status: :unprocessable_entity) if snapshot.length < 2
       run = ProfileRun.create!(user: current_user, asset_snapshot: snapshot)
       enqueue(run)

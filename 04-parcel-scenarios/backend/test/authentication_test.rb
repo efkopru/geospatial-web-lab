@@ -167,6 +167,41 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test 'an address may make a limited number of sign-in attempts of any kind' do
+    post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
+    assert_response :success
+    assert_equal 1, Rails.cache.read('sign-ins:127.0.0.1'), 'A successful sign-in counts as an attempt'
+    Rails.cache.write('sign-ins:127.0.0.1', Api::SessionsController::SIGN_INS_PER_ADDRESS, expires_in: 15.minutes)
+    post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
+    assert_response :too_many_requests
+    assert_match 'Too many sign-in attempts from this address', response.parsed_body['error']
+    post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json, env: {'REMOTE_ADDR' => '198.51.100.9'}
+    assert_response :success
+    travel 16.minutes
+    post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json
+    assert_response :success
+  end
+
+  test 'an account keeps its newest sessions and drops revoked ones first' do
+    limit = LoginSession::MAX_PER_USER
+    _oldest, oldest_token = LoginSession.issue!(@user)
+    revoked, = LoginSession.issue!(@user)
+    revoked.update!(revoked_at: Time.current)
+    (limit - 2).times { LoginSession.issue!(@user) }
+    assert_equal limit, LoginSession.where(user: @user).count
+    LoginSession.issue!(@user)
+    assert_equal limit, LoginSession.where(user: @user).count
+    assert_not LoginSession.exists?(revoked.id), 'A revoked session is removed before an active one'
+    assert LoginSession.authenticate(oldest_token), 'The oldest active session still works'
+    LoginSession.issue!(@user)
+    assert_equal limit, LoginSession.where(user: @user).count
+    assert_nil LoginSession.authenticate(oldest_token), 'The browser that signed in longest ago is signed out'
+    other = User.create!(email: 'auth-sessions@example.test', name: 'Other user', password: 'Learning123!', role: 'reporter')
+    _record, other_token = LoginSession.issue!(other)
+    assert LoginSession.authenticate(other_token)
+    assert_equal limit, LoginSession.where(user: @user).count
+  end
+
   test 'unknown emails and blank passwords are rejected like wrong passwords' do
     post '/api/session', params: {email: 'nobody@example.test', password: 'Learning123!'}, as: :json
     assert_response :unauthorized

@@ -2,6 +2,9 @@ require 'digest'
 class LoginSession < ApplicationRecord
   belongs_to :user
   scope :active, -> { where(revoked_at: nil).where('expires_at > ?', Time.current) }
+  # An account keeps this many sessions, so repeated sign-ins cannot fill the table. Signing in
+  # beyond it removes revoked sessions first, then signs out the browsers that signed in longest ago.
+  MAX_PER_USER = 20
 
   def self.issue!(user)
     # Expired rows can never authenticate again, so each sign-in clears them out. Revoked
@@ -9,6 +12,7 @@ class LoginSession < ApplicationRecord
     where('expires_at <= ?', Time.current).delete_all
     token = SecureRandom.hex(32)
     record = create!(user: user, token_digest: Digest::SHA256.hexdigest(token), expires_at: 24.hours.from_now)
+    where(id: where(user: user).order(Arel.sql('revoked_at IS NOT NULL'), id: :desc).offset(MAX_PER_USER).select(:id)).delete_all
     [record, token]
   end
 

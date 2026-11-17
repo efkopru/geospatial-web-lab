@@ -15,6 +15,7 @@ class Dataset < ApplicationRecord
 
   def self.import!(user:, name:, source_text:, required_attributes: ["asset_id"])
     raise ArgumentError, "GeoJSON must be supplied as text" unless source_text.is_a?(String)
+    raise ArgumentError, "Dataset name must be text" unless name.nil? || name.is_a?(String)
     raise ArgumentError, "File exceeds the 5 MB limit" if source_text.bytesize > MAX_SOURCE_BYTES
     source = JSON.parse(source_text)
     unless source.is_a?(Hash) && source["type"] == "FeatureCollection" && source["features"].is_a?(Array)

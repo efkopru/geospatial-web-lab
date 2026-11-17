@@ -1,7 +1,9 @@
 name: Verify container images
 
 on:
+  # Pull requests run this for their branches; a push runs it only on main.
   push:
+    branches: [main]
     paths:
       - '0[1-5]-*/backend/**'
       - '0[1-5]-*/frontend/**'
@@ -56,7 +58,7 @@ jobs:
           - 05-infrastructure-inspections
     steps:
       - name: Check out source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Build, start and check the Compose stack

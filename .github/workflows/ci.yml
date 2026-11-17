@@ -31,14 +31,14 @@ jobs:
         image: redis:7-alpine
         ports: ['6379:6379']
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: npm
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
         with:
           ruby-version: '3.4'
       - name: Install PostgreSQL 17 client for matching schema dumps
@@ -59,7 +59,7 @@ jobs:
       - run: npm ci
       # The five backends share two lockfiles, so one gem directory serves all of them.
       - name: Cache backend gems
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/vendor/bundle
           key: backend-gems-${{ runner.os }}-ruby3.4-${{ hashFiles('0*/backend/Gemfile.lock') }}
@@ -115,7 +115,7 @@ jobs:
             curl -fsS "http://127.0.0.1:$port/" > /dev/null
           done
           npm run test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: diagnostics

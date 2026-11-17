@@ -1,6 +1,12 @@
 source "https://rubygems.org"
 ruby ">= 3.4.0"
-gem "rails", "~> 8.1.0"
+# Only the Rails components that config/application.rb loads. The rails gem would also install
+# Active Storage, Action Mailbox, Action Mailer and Action Text, which these apps never use.
+gem "railties", "~> 8.1.0", require: false
+gem "activerecord", "~> 8.1.0", require: false
+gem "actionpack", "~> 8.1.0", require: false
+gem "actioncable", "~> 8.1.0", require: false
+gem "activejob", "~> 8.1.0", require: false
 gem "pg", "~> 1.6"
 gem "puma", "~> 7.0"
 gem "bcrypt", "~> 3.1"
