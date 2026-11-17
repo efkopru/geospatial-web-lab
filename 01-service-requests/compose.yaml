@@ -1,6 +1,13 @@
 name: geolab-service-requests
+# Every service keeps at most 50 MB of container logs and cannot gain privileges after it starts.
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "5"}
+x-security-opt: &no-new-privileges ["no-new-privileges:true"]
 services:
   db:
+    logging: *logging
+    security_opt: *no-new-privileges
     restart: unless-stopped
     image: postgis/postgis:17-3.5
     environment:
@@ -17,6 +24,8 @@ services:
       timeout: 5s
       retries: 20
   redis:
+    logging: *logging
+    security_opt: *no-new-privileges
     restart: unless-stopped
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
@@ -27,6 +36,9 @@ services:
       timeout: 5s
       retries: 20
   migrate:
+    logging: *logging
+    security_opt: *no-new-privileges
+    cap_drop: [ALL]
     build: ./backend
     environment: &app-env
       DATABASE_URL: postgres://geolab_app@db:5432/service_requests
@@ -42,6 +54,9 @@ services:
       db: {condition: service_healthy}
       redis: {condition: service_healthy}
   api:
+    logging: *logging
+    security_opt: *no-new-privileges
+    cap_drop: [ALL]
     stop_grace_period: 30s
     restart: unless-stopped
     build: ./backend
@@ -55,6 +70,9 @@ services:
       timeout: 5s
       retries: 10
   worker:
+    logging: *logging
+    security_opt: *no-new-privileges
+    cap_drop: [ALL]
     stop_grace_period: 40s
     restart: unless-stopped
     build: ./backend
@@ -64,6 +82,11 @@ services:
       migrate: {condition: service_completed_successfully}
       redis: {condition: service_healthy}
   web:
+    logging: *logging
+    security_opt: *no-new-privileges
+    # nginx starts as root to bind port 80 and own its cache folders, then serves as the nginx user.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID, NET_BIND_SERVICE]
     restart: unless-stopped
     build:
       context: ..

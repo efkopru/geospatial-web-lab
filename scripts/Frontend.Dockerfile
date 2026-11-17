@@ -12,7 +12,8 @@ ARG PROJECT
 # true prefills the seeded learning accounts on the sign-in form; false hides them.
 ARG DEMO_ACCOUNTS=true
 RUN VITE_DEMO_ACCOUNTS="$DEMO_ACCOUNTS" npm run build --workspace ./${PROJECT}/frontend && cp -r ${PROJECT}/frontend/dist /site
-FROM nginx:alpine
+# The stable series: its tag follows patch releases, and a newer series is a deliberate change.
+FROM nginx:1.30-alpine
 COPY scripts/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /site /usr/share/nginx/html
 EXPOSE 80
