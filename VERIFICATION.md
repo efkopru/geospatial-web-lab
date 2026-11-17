@@ -292,3 +292,31 @@ Rails 8.1.4.1 and Rack 3.2.8 carry security fixes. From November 10, Dependabot 
 - Brakeman 8.1.0 reported no warnings for any backend and identified Rails 8.1.4.1. ESLint reported no problems, root Vitest passed 60 tests across 14 files, and the runtime and copied-file checks passed 34, including the new initializer.
 - The complete Playwright run passed all 18 scenarios against the WSL backends on Rails 8.1.4.1.
 - Not verified locally: the container images and the new smoke-test step, which the container workflow runs.
+
+## Hardening and input handling: November 16, 2026
+
+The second part of the November review: limits on what one client can make the servers log or do, plain answers for malformed input, fewer installed gems, and tighter containers and workflows.
+
+| Project | Tests | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Service requests | 52 | 548 | Passed |
+| Data quality portal | 49 | 403 | Passed |
+| Fleet monitor | 49 | 362 | Passed |
+| Parcel scenarios | 41 | 286 | Passed |
+| Infrastructure inspections | 57 | 563 | Passed |
+| Total | 248 | 2162 | No failures, errors, or skipped tests |
+
+- **Request logs.** Rails logs every parameter before any `before_action` runs, and it also nested JSON parameters under the controller's name. A sign-in request with a 1 MB extra parameter therefore added 2 MB to the log, with no sign-in needed. A body over 10 KB is now logged as its size, parameters are no longer nested a second time, and the upload parameters `source` and `geojson` are never logged. The same request against the running WSL stack was logged as `"request body" => "[1000072 bytes not logged]"`.
+- **Request size.** nginx now accepts 64 KB per request, 3 MB for a request import and 12 MB for a dataset. With nginx 1.24 and this configuration, a 70 KB body was refused with 413 on `/api/session`, `/api/issues`, `/cable` and the retry and approve routes; `/api/import_runs` accepted 2.5 MB and refused 3.5 MB; `/api/datasets` accepted 11 MB and refused 13 MB. Both upload locations still received the proxy headers. Each Compose service keeps five 10 MB log files.
+- **Live updates.** Before, 200 subscribe commands on one connection created 200 subscriptions, each with its own 15-second session check. A connection now holds five. A browser WebSocket to the running stack that sent eight subscribe commands received five confirmations and three rejections; when it then sent a 5 KB message, the server closed it with the reason `message_too_large`.
+- **Sign-in.** An address may make 300 sign-in attempts of any kind in 15 minutes, and an account keeps its 20 newest sessions, removing revoked sessions before active ones.
+- **Write limits.** One account may create 120 service requests, or record 60 observations, in ten minutes. Each test creates that many, expects the next to be refused with 429, confirms another account is not limited, and creates one more after eleven minutes.
+- **Malformed input before these changes.** A NUL character answered HTTP 500 in a request's title or description, an import, a scenario name, the parcel district filter and an observation's notes. The fleet app returned Ruby error text such as `undefined method 'map' for an instance of String`. The data quality app stored a dataset name that was not text as its Ruby inspect text. The request list reported a distance-filter error for other malformed filters, and the parcel list answered 500 for a district that was not text. All of these now answer 422 with a plain message and store nothing.
+- **Asset list.** The inspection app counted open observations by loading every observation of every asset. It now reads the counts in one grouped query; a test asserts that listing assets and creating a profile run select no observation rows.
+- **Unused Rails frameworks.** Each Gemfile lists `railties`, `activerecord`, `actionpack`, `actioncable` and `activejob` instead of `rails`. The lockfiles lose 14 gems, including Active Storage, Action Mailbox, Action Mailer and Action Text; no remaining gem changed version. All five apps passed the production eager-load and boot check, and Brakeman still identifies Rails 8.1.4.1.
+- **Containers.** Every service runs with `no-new-privileges`. The Rails services drop all Linux capabilities, and nginx keeps four. nginx no longer reports its version: the local run answered `Server: nginx`. The web image uses `nginx:1.30-alpine` instead of the moving `nginx:alpine` tag. `docker compose config` accepted all five files.
+- **Workflows and Dependabot.** The container and standalone workflows ran twice for each pull request push; a push now runs them only on `main`. All 22 action references are pinned to commits, each checked against its version tag through the GitHub API. `.github/dependabot.yml` asks for grouped security updates and monthly grouped updates of the pinned actions.
+- **New tests against the previous code.** Each backend gains seven shared tests; against the previous code five failed and two raised errors. The twelve tests specific to one app all failed or raised errors against the previous application code.
+- The complete Playwright run passed all 18 scenarios against the WSL backends. Brakeman 8.1.0 reported no warnings. ESLint reported no problems; root Vitest passed 60 tests across 14 files; the runtime and copied-file checks passed 36; the standalone editions passed 79 domain, storage and packaging tests and 10 interface tests; the backend supervisor shell test passed.
+- PDF footers now show the day each PDF was built instead of a fixed edition date; the README, HOW_TO_USE and PROJECT_SUMMARY PDFs were rebuilt.
+- Not verified locally: the container images with the new privilege limits, the new smoke-test steps, the pinned actions in the publishing workflow, and how Dependabot applies the new configuration. The container workflow covers the first two on the pull request.
