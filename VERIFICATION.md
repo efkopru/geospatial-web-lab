@@ -269,3 +269,26 @@ In Rails 8.1, Action Cable's Redis listener retried a lost connection once, imme
 - End to end on the WSL stack: a staff page in the service-request app stayed open while `service redis-server restart` ran. The API logged the lost connection and then "reconnected to Redis and resubscribed 2 streams". A broadcast to the staff stream reached the page, which still showed "Live updates connected".
 - On those backends, still running since the restart, every Playwright scenario passed: 17 in a full run, and the parcels scenario on its own. In that full run, the parcels scenario failed to load a pre-bundled Vite dependency whose version had just changed. The preceding run had ended with app 05's Vite dev server crashing on Windows (exit 0xC0000409). Neither failure involved Action Cable.
 - The copied-file check now also covers the initializer and its test.
+
+## Rails security release: November 16, 2026
+
+Rails 8.1.4.1 and Rack 3.2.8 carry security fixes. From November 10, Dependabot reported 37 advisories in each of the five backends (185 alerts) and opened 30 pull requests, each named for one gem in one backend. One update replaces them: all five lockfiles move Rails 8.1.4 to 8.1.4.1, Rack 3.2.7 to 3.2.8, Nokogiri 1.19.4 to 1.19.7, Loofah 2.25.2 to 2.25.3, Crass 1.0.7 to 1.0.8 and rails-html-sanitizer 1.7.1 to 1.7.2. No other gem changed, and the five lockfiles still differ only by the service-request app's `csv` gem.
+
+| Project | Tests | Assertions | Result |
+| --- | ---: | ---: | --- |
+| Service requests | 42 | 343 | Passed |
+| Data quality portal | 41 | 340 | Passed |
+| Fleet monitor | 39 | 257 | Passed |
+| Parcel scenarios | 32 | 225 | Passed |
+| Infrastructure inspections | 47 | 428 | Passed |
+| Total | 201 | 1593 | No failures, errors, or skipped tests |
+
+- **Which advisories reach these apps.** Three do: client address spoofing in `request.remote_ip` (confirmed below), a possible process crash through the channel name of an Action Cable subscribe command (reachable only by signed-in clients here, not reproduced), and unbounded buffering of crafted multipart bodies (nginx limits a request to 12 MB; not reproduced). Active Storage, Action Mailbox, Action Mailer and Action Text are installed by the `rails` gem but `config/application.rb` does not require them: in each backend's test environment none of the four was loaded and no route belonged to them. The critical advisory is in Active Storage.
+- **Address spoofing before the update.** Since Rails 8.1.0, `request.remote_ip` preferred a `Forwarded` header to `X-Forwarded-For`, and nginx passed a client's `Forwarded` header through. On Rails 8.1.4, 25 failed sign-ins from one client that each named a different address in `Forwarded` were all checked (the limit is 20 for one address), and so were 8 for one email (the limit is 5). The limit of 30 an hour for one email from all addresses still held.
+- **Rails 8.1.4.1 alone is not enough.** It refuses a `Forwarded` header that contradicts `X-Forwarded-For` only when the client's own address is public, and it refuses by raising an unhandled error. A client at a private address, as nginx sees clients on a local network or through Docker's gateway, still had all 22 of 22 failed sign-ins checked.
+- **The fix has three layers.** The lockfiles carry the Rails fix. A new initializer, identical in all five backends, has Rack read only the `X-Forwarded-*` headers, so a `Forwarded` header changes nothing; with it, both a public and a private client were refused after 20 failures. nginx removes a client's `Forwarded` header and now appends the client address to `X-Forwarded-For` for `/cable` and `/up` as it did for `/api/`.
+- **Tests.** A new test in the shared authentication suite sends 22 failed sign-ins with a different `Forwarded` header each, for a public and for a private client behind a proxy, and expects twenty 401 answers followed by two 429 answers. Without the initializer it fails on Rails 8.1.4.1. The container smoke test now sends six failed sign-ins for one email through nginx with different `Forwarded` headers and expects the sixth to be refused; it runs in CI.
+- **nginx.** `scripts/nginx.conf` was run with nginx 1.24 in front of an upstream that echoes the headers it receives. With the previous configuration a client's `Forwarded` header reached the upstream on `/api/`, `/cable` and `/up`; with this one it does not, and `X-Forwarded-For` ends with the address nginx saw on all three.
+- Brakeman 8.1.0 reported no warnings for any backend and identified Rails 8.1.4.1. ESLint reported no problems, root Vitest passed 60 tests across 14 files, and the runtime and copied-file checks passed 34, including the new initializer.
+- The complete Playwright run passed all 18 scenarios against the WSL backends on Rails 8.1.4.1.
+- Not verified locally: the container images and the new smoke-test step, which the container workflow runs.
