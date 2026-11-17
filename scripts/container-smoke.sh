@@ -79,6 +79,21 @@ asset_headers="$(curl -fsS -D - -o /dev/null -H 'Accept-Encoding: gzip' "$base/$
 [[ "$(curl -s -o /dev/null -w '%{http_code}' "$base/assets/missing-file.js")" == 404 ]] || fail "a missing asset did not return 404"
 step "nginx sends security headers, compresses and caches the bundle"
 
+# Failed sign-ins are limited per client address. A client's own Forwarded header must not move
+# them to other addresses, so the sixth wrong password for one email is refused. Five failures
+# stay well below the limit for the address, so later sign-ins from this host are unaffected.
+jar="$(mktemp)"
+csrf="$(curl -fsS -c "$jar" "$base/api/session" | grep -o '"csrf_token":"[^"]*"' | cut -d'"' -f4)"
+[[ -n "$csrf" ]] || fail "/api/session returned no CSRF token for the sign-in check"
+codes=""
+for attempt in 1 2 3 4 5 6; do
+ codes+="$(curl -s -o /dev/null -w '%{http_code}' -b "$jar" -c "$jar" -H "X-CSRF-Token: $csrf" -H 'Content-Type: application/json' \
+  -H "Forwarded: for=203.0.113.$attempt" -d '{"email":"smoke-nobody@example.test","password":"wrong password"}' "$base/api/session") "
+done
+rm -f "$jar"
+[[ "$codes" == "401 401 401 401 401 429 " ]] || fail "six failed sign-ins sent with Forwarded headers answered $codes, not five 401s and a 429"
+step "a client's Forwarded header does not move its failed sign-ins to another address"
+
 "${compose[@]}" exec -T api bundle exec rails db:seed >/dev/null || fail "db:seed failed in the API container"
 step "seed data loaded inside the API container"
 

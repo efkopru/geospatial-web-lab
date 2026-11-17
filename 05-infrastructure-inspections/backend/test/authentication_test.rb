@@ -101,6 +101,20 @@ class AuthenticationTest < ActionDispatch::IntegrationTest
     assert_response :too_many_requests
   end
 
+  test 'a Forwarded header does not change the address failed sign-ins are counted against' do
+    # nginx, at a private address, appends the client's address to X-Forwarded-For. The client is
+    # public or, on a local network, private; Rails 8.1.4.1 alone refuses the header only for the first.
+    {'198.51.100.7' => 'A public client', '172.18.0.1' => 'A client on the local network'}.each do |client, description|
+      Rails.cache.clear
+      statuses = 22.times.map do |attempt|
+        post '/api/session', params: {email: "guess-#{attempt}@example.test", password: 'wrong password'}, as: :json,
+          headers: {'X-Forwarded-For' => client, 'Forwarded' => "for=203.0.113.#{attempt + 1}"}, env: {'REMOTE_ADDR' => '172.18.0.5'}
+        response.status
+      end
+      assert_equal [401] * 20 + [429] * 2, statuses, "#{description} moved its failed sign-ins to other addresses"
+    end
+  end
+
   test 'failed sign-ins for one email are limited across addresses, except in browsers that signed in before' do
     known = open_session
     known.post '/api/session', params: {email: @user.email, password: 'Learning123!'}, as: :json, env: {'REMOTE_ADDR' => '198.51.100.1'}
