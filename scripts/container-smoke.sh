@@ -97,7 +97,9 @@ step "a client's Forwarded header does not move its failed sign-ins to another a
 
 # nginx accepts 64 KB on ordinary routes and more only on the two upload routes. Rails then logs
 # a body larger than 10 KB as its size, so a request cannot fill the log with its content.
-padded() { head -c "$1" /dev/zero | tr '\000' 'x' | curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary @- "$base$2"; }
+# The bodies are valid JSON: Rails quotes the first characters of a body it cannot parse in its
+# error message, which would put the padding in the log this step searches.
+padded() { printf '{"padding":"%s"}' "$(head -c "$1" /dev/zero | tr '\000' 'x')" | curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary @- "$base$2"; }
 [[ "$(padded 200000 /api/session)" == 413 ]] || fail "a 200 KB body sent to /api/session was not refused with 413"
 [[ "$(padded 200000 /api/import_runs)" != 413 ]] || fail "a 200 KB body sent to the import route was refused with 413"
 marker="smoke$RANDOM$RANDOM"
@@ -106,7 +108,7 @@ status="$(printf '{"email":"%s@example.test","padding":"%s"}' "$marker" "$(head 
 [[ "$status" == 422 ]] || fail "a sign-in without a CSRF token answered $status, not 422"
 api_log="$("${compose[@]}" logs --no-color api)"
 [[ "$api_log" == *'bytes not logged'* ]] || fail "the API log does not record the size of a 50 KB request body"
-[[ "$api_log" != *"$marker"* && "$api_log" != *'xxxxxxxxxxxxxxxx'* ]] || fail "the API log contains the content of a 50 KB request body"
+[[ "$api_log" != *"$marker"* && "$api_log" != *'xxxxxxxxxxxxxxxx'* ]] || fail "the API log contains the content of a 50 KB or 200 KB request body"
 step "large bodies are refused outside the upload routes and are not written to the API log"
 
 "${compose[@]}" exec -T api bundle exec rails db:seed >/dev/null || fail "db:seed failed in the API container"
